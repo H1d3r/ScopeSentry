@@ -5,3 +5,4 @@ config.yaml
 file/
 PLUGINKEY
 dist/
+.uploads/
