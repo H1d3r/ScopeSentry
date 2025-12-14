@@ -118,15 +118,16 @@ func (s *service) Save(ctx *gin.Context, req *models.PluginSaveRequest) error {
 	if req.ID == "" {
 		// 创建新插件
 		plugin := &models.Plugin{
-			Name:         req.Name,
-			Module:       req.Module,
-			Hash:         generatePluginHash(32),
-			Parameter:    req.Parameter,
-			Help:         req.Help,
-			Introduction: req.Introduction,
-			Source:       req.Source,
-			Version:      req.Version,
-			IsSystem:     false,
+			Name:          req.Name,
+			Module:        req.Module,
+			Hash:          generatePluginHash(32),
+			Parameter:     req.Parameter,
+			Help:          req.Help,
+			Introduction:  req.Introduction,
+			Source:        req.Source,
+			Version:       req.Version,
+			ParameterList: req.ParameterList,
+			IsSystem:      false,
 		}
 		id, err := s.repo.Create(ctx, plugin)
 		if err != nil {
@@ -152,13 +153,14 @@ func (s *service) Save(ctx *gin.Context, req *models.PluginSaveRequest) error {
 		}
 
 		update := bson.M{
-			"name":         req.Name,
-			"module":       req.Module,
-			"parameter":    req.Parameter,
-			"help":         req.Help,
-			"introduction": req.Introduction,
-			"source":       req.Source,
-			"version":      req.Version,
+			"name":          req.Name,
+			"module":        req.Module,
+			"parameter":     req.Parameter,
+			"help":          req.Help,
+			"introduction":  req.Introduction,
+			"parameterList": req.ParameterList,
+			"source":        req.Source,
+			"version":       req.Version,
 		}
 		err = s.repo.Update(ctx, id, update)
 		if err != nil {

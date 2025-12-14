@@ -121,6 +121,17 @@ func (s *service) UpdatePoc(ctx *gin.Context, req *models.PocUpdateRequest) erro
 	if err != nil {
 		return fmt.Errorf("failed to update poc: %w", err)
 	}
+	go func() {
+		msg := models.Message{
+			Name:    "all",
+			Type:    "poc",
+			Content: fmt.Sprintf(`add:%v`, req.ID),
+		}
+		err = s.nodeService.RefreshConfig(ctx, msg)
+		if err != nil {
+			logger.Error("failed to refresh config", zap.Error(err))
+		}
+	}()
 
 	return nil
 }
@@ -156,7 +167,7 @@ func (s *service) AddPoc(ctx *gin.Context, req *models.PocAddRequest) error {
 		msg := models.Message{
 			Name:    "all",
 			Type:    "poc",
-			Content: fmt.Sprintf(`add:%v`, res.InsertedID),
+			Content: fmt.Sprintf(`add:%v`, res.InsertedID.(primitive.ObjectID).Hex()),
 		}
 		err = s.nodeService.RefreshConfig(ctx, msg)
 		if err != nil {

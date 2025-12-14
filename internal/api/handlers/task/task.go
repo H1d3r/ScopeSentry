@@ -300,7 +300,7 @@ func StartTask(c *gin.Context) {
 type ProgressInfoRequest struct {
 	ID        string `json:"id" binding:"required" example:"507f1f77bcf86cd799439011"`
 	PageIndex int    `json:"pageIndex" binding:"omitempty,min=1" example:"1"`
-	PageSize  int    `json:"pageSize" binding:"omitempty,min=1,max=100" example:"10"`
+	PageSize  int    `json:"pageSize" binding:"omitempty,min=1" example:"10"`
 }
 
 // ProgressInfo 获取任务进度信息

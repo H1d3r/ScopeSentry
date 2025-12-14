@@ -63,7 +63,12 @@ func (r *repository) FindWithPagination(ctx context.Context, query bson.M, opts 
 // FindByModule 根据模块查询插件
 func (r *repository) FindByModule(ctx context.Context, module string) ([]models.Plugin, error) {
 	query := bson.M{"module": module}
-	cursor, err := r.collection.Find(ctx, query)
+
+	opts := options.Find().SetProjection(bson.M{
+		"source": 0,
+	})
+
+	cursor, err := r.collection.Find(ctx, query, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find documents: %w", err)
 	}

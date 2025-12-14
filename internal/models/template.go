@@ -11,6 +11,7 @@ type ScanTemplate struct {
 	TaskName            string     `bson:"TaskName" json:"TaskName"`
 	TargetHandler       []string   `bson:"TargetHandler" json:"TargetHandler"`
 	Parameters          Parameters `bson:"Parameters" json:"Parameters"`
+	ParameterLists      Parameters `bson:"ParameterLists" json:"ParameterLists"`
 	SubdomainScan       []string   `bson:"SubdomainScan" json:"SubdomainScan"`
 	SubdomainSecurity   []string   `bson:"SubdomainSecurity" json:"SubdomainSecurity"`
 	PortScanPreparation []string   `bson:"PortScanPreparation" json:"PortScanPreparation"`

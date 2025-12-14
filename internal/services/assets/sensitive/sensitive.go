@@ -211,7 +211,10 @@ func (s *service) GetSIDStatistics(ctx *gin.Context, query models.SearchRequest)
 			"count": bson.M{"$sum": 1},
 			"color": bson.M{"$first": "$color"},
 		}}},
-		{{Key: "$sort", Value: bson.M{"count": -1}}},
+		{{Key: "$sort", Value: bson.M{
+			"count": -1, // 先按 count 排序
+			"_id":   1,  // count 相同按 _id 排序，保证稳定顺序
+		}}},
 		{{Key: "$project", Value: bson.M{
 			"name":  "$_id",
 			"count": 1,
@@ -227,6 +230,7 @@ func (s *service) GetSIDStatistics(ctx *gin.Context, query models.SearchRequest)
 	if result == nil {
 		return []models.SensitiveSIDStat{}, nil
 	}
+
 	return result, nil
 }
 

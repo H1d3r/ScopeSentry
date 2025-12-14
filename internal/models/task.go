@@ -95,7 +95,7 @@ type TaskProgressDetail struct {
 type ListRequest struct {
 	Search    string `json:"search" binding:"omitempty" example:"测试"`
 	PageIndex int    `json:"pageIndex" binding:"required,min=1" example:"1"`
-	PageSize  int    `json:"pageSize" binding:"required,min=1,max=100" example:"10"`
+	PageSize  int    `json:"pageSize" binding:"required,min=1" example:"10"`
 }
 
 // ScheduledTask 计划任务模型
@@ -130,7 +130,7 @@ type ScheduledTask struct {
 type ScheduledTaskListRequest struct {
 	Search    string `json:"search" binding:"omitempty" example:"测试"`
 	PageIndex int    `json:"pageIndex" binding:"omitempty,min=1" example:"1"`
-	PageSize  int    `json:"pageSize" binding:"omitempty,min=1,max=100" example:"10"`
+	PageSize  int    `json:"pageSize" binding:"omitempty,min=1" example:"10"`
 }
 
 // ScheduledTaskDetailRequest 计划任务详情请求
@@ -201,7 +201,7 @@ type PageMonitoringTask struct {
 type PageMonitoringListRequest struct {
 	Search    string `json:"search" binding:"omitempty" example:"example.com"`
 	PageIndex int    `json:"pageIndex" binding:"omitempty,min=1" example:"1"`
-	PageSize  int    `json:"pageSize" binding:"omitempty,min=1,max=100" example:"10"`
+	PageSize  int    `json:"pageSize" binding:"omitempty,min=1" example:"10"`
 }
 
 // PageMonitoringAddRequest 页面监控添加请求

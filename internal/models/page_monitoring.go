@@ -41,7 +41,7 @@ type PageMonitoringDiffRequest struct {
 // PageMonitoringResultRequest 页面监控结果请求
 type PageMonitoringResultRequest struct {
 	PageIndex int                    `json:"pageIndex" binding:"required,min=1" example:"1"`
-	PageSize  int                    `json:"pageSize" binding:"required,min=1,max=100" example:"10"`
+	PageSize  int                    `json:"pageSize" binding:"required,min=1" example:"10"`
 	Query     map[string]interface{} `json:"query" binding:"required" example:"{\"url\":\"example.com\"}"`
 }
 

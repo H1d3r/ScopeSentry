@@ -18,7 +18,7 @@ var sensitiveService svc.Service
 type listRequest struct {
 	Search    string `json:"search" binding:"omitempty"`
 	PageIndex int    `json:"pageIndex" binding:"required,min=1"`
-	PageSize  int    `json:"pageSize" binding:"required,min=1,max=100"`
+	PageSize  int    `json:"pageSize" binding:"required,min=1"`
 }
 
 type updateRequest struct {

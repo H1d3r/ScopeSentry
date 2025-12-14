@@ -69,7 +69,12 @@ func (s *service) Insert(ctx *gin.Context, task *models.Task) (string, error) {
 	var err error
 	query.PageSize = task.TargetNumber
 	query.SearchExpression = task.Search
-	query.Filter = task.Filter
+	query.Filter = make(map[string][]interface{})
+	projects := make([]interface{}, len(task.Project))
+	for i, v := range task.Project {
+		projects[i] = v
+	}
+	query.Filter["project"] = projects
 	if task.TargetSource == "general" {
 		//普通的情况不需要做改变
 	} else if task.TargetSource == "project" {
@@ -205,7 +210,7 @@ func (s *service) CreateTaskScan(ctx context.Context, task models.Task, id strin
 			continue
 		}
 	}
-	logger.Info(fmt.Sprintf("CreateTaskScan task:%v success", task.ID))
+	logger.Info(fmt.Sprintf("CreateTaskScan task:%v success", task.ID.Hex()))
 	return 0, nil
 }
 
