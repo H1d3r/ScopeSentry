@@ -10,9 +10,11 @@ import (
 	"io"
 	"io/ioutil"
 	"math/rand"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Autumn-27/ScopeSentry/internal/constants"
@@ -21,6 +23,7 @@ import (
 	"github.com/Autumn-27/ScopeSentry/internal/repositories/plugin"
 	"github.com/Autumn-27/ScopeSentry/internal/services/node"
 	"github.com/gin-gonic/gin"
+	"github.com/valyala/fasthttp"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -42,6 +45,8 @@ type Service interface {
 	Recheck(ctx *gin.Context, req *models.PluginRecheckRequest) error
 	Uninstall(ctx *gin.Context, req *models.PluginUninstallRequest) error
 	CheckKey(ctx *gin.Context, req *models.PluginKeyCheckRequest) error
+	SearchRemotePlugins(ctx *gin.Context) (map[string]interface{}, error)
+	ImportByData(ctx *gin.Context, req *models.PluginImportByDataRequest) error
 }
 
 // service 实现插件服务接口
@@ -321,15 +326,16 @@ func (s *service) Import(ctx *gin.Context, filePath string, reqKey string) error
 	// 9. 触发配置刷新
 
 	p := &models.Plugin{
-		Name:         pluginInfo.Name,
-		Module:       pluginInfo.Module,
-		Hash:         pluginInfo.Hash,
-		Parameter:    pluginInfo.Parameter,
-		Help:         pluginInfo.Help,
-		Introduction: pluginInfo.Introduction,
-		Source:       pluginInfo.Source,
-		Version:      pluginInfo.Version,
-		IsSystem:     false,
+		Name:          pluginInfo.Name,
+		Module:        pluginInfo.Module,
+		Hash:          pluginInfo.Hash,
+		Parameter:     pluginInfo.Parameter,
+		Help:          pluginInfo.Help,
+		Introduction:  pluginInfo.Introduction,
+		ParameterList: pluginInfo.ParameterList,
+		Source:        pluginInfo.Source,
+		Version:       pluginInfo.Version,
+		IsSystem:      false,
 	}
 	id, err := s.repo.Create(ctx, p)
 	if err != nil {
@@ -410,6 +416,230 @@ func (s *service) CheckKey(ctx *gin.Context, req *models.PluginKeyCheckRequest) 
 	if req.Key != strings.TrimSpace(string(key)) {
 		return fmt.Errorf("invalid plugin key")
 	}
+	return nil
+}
+
+// RemotePluginResponse 远程插件API响应结构
+type RemotePluginResponse struct {
+	Timestamp int64            `json:"timestamp"`
+	Status    string           `json:"status"`
+	Message   string           `json:"message"`
+	Data      RemotePluginData `json:"data"`
+}
+
+type RemotePluginData struct {
+	Total int64              `json:"total"`
+	Data  []RemotePluginItem `json:"data"`
+}
+
+type RemotePluginItem struct {
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
+	Module       string `json:"module"`
+	PriceStatus  int    `json:"priceStatus"`
+	Price        *int   `json:"price"`
+	Hash         string `json:"hash"`
+	Introduction string `json:"introduction"`
+	Version      string `json:"version"`
+	CreateTime   string `json:"createTime"`
+	Username     string `json:"username"`
+	IsInstalled  bool   `json:"isInstalled"` // 是否已安装
+	NeedUpdate   bool   `json:"needUpdate"`  // 是否需要更新
+}
+
+// SearchRemotePlugins 搜索远程插件并对比已安装的插件
+func (s *service) SearchRemotePlugins(ctx *gin.Context) (map[string]interface{}, error) {
+	var installedPlugins []models.Plugin
+	var remotePlugins RemotePluginResponse
+	var installedErr, remoteErr error
+	var wg sync.WaitGroup
+
+	// 并发获取已安装的插件和远程插件
+	wg.Add(2)
+
+	// 获取已安装的插件
+	go func() {
+		defer wg.Done()
+		query := bson.M{}
+		opts := options.Find()
+		installedPlugins, installedErr = s.repo.FindWithPagination(ctx, query, opts)
+	}()
+
+	// 获取远程插件
+	go func() {
+		defer wg.Done()
+		client := &fasthttp.Client{
+			ReadTimeout: 30 * time.Second,
+		}
+
+		req := fasthttp.AcquireRequest()
+		resp := fasthttp.AcquireResponse()
+		defer fasthttp.ReleaseRequest(req)
+		defer fasthttp.ReleaseResponse(resp)
+
+		req.SetRequestURI("https://api.scope-sentry.top/api/common/plugin/search")
+		req.Header.SetMethod("POST")
+		req.Header.SetContentType("application/json")
+
+		// 构建请求体
+		requestBody := map[string]interface{}{
+			"name":        "",
+			"priceStatus": 2,
+			"module":      "All",
+			"tags":        "",
+			"page":        1,
+			"size":        200,
+		}
+		bodyBytes, err := json.Marshal(requestBody)
+		if err != nil {
+			remoteErr = fmt.Errorf("failed to marshal request body: %w", err)
+			return
+		}
+		req.SetBody(bodyBytes)
+
+		err = client.Do(req, resp)
+		if err != nil {
+			remoteErr = fmt.Errorf("failed to request remote api: %w", err)
+			return
+		}
+
+		if resp.StatusCode() != http.StatusOK {
+			remoteErr = fmt.Errorf("remote api returned status code: %d", resp.StatusCode())
+			return
+		}
+
+		if err := json.Unmarshal(resp.Body(), &remotePlugins); err != nil {
+			remoteErr = fmt.Errorf("failed to unmarshal response: %w", err)
+			return
+		}
+	}()
+
+	wg.Wait()
+
+	// 检查错误
+	if installedErr != nil {
+		return nil, fmt.Errorf("failed to get installed plugins: %w", installedErr)
+	}
+	if remoteErr != nil {
+		return nil, fmt.Errorf("failed to get remote plugins: %w", remoteErr)
+	}
+
+	// 构建已安装插件的hash映射和version映射
+	installedHashMap := make(map[string]models.Plugin)
+	for _, plugin := range installedPlugins {
+		installedHashMap[plugin.Hash] = plugin
+	}
+
+	// 为远程插件添加安装状态和更新状态
+	resultPlugins := make([]RemotePluginItem, 0, len(remotePlugins.Data.Data))
+	for _, remotePlugin := range remotePlugins.Data.Data {
+		installedPlugin, isInstalled := installedHashMap[remotePlugin.Hash]
+
+		remotePlugin.IsInstalled = isInstalled
+
+		// 如果已安装，检查版本是否需要更新
+		if isInstalled {
+			// 只有当远程版本不为空且与已安装版本不同时，才需要更新
+			remoteVersion := strings.TrimSpace(remotePlugin.Version)
+			installedVersion := strings.TrimSpace(installedPlugin.Version)
+
+			if remoteVersion != "" && remoteVersion != installedVersion {
+				remotePlugin.NeedUpdate = true
+			} else {
+				remotePlugin.NeedUpdate = false
+			}
+		} else {
+			remotePlugin.NeedUpdate = false
+		}
+
+		resultPlugins = append(resultPlugins, remotePlugin)
+	}
+
+	return map[string]interface{}{
+		"total": remotePlugins.Data.Total,
+		"data":  resultPlugins,
+	}, nil
+}
+
+// ImportByData 通过POST JSON数据导入插件
+func (s *service) ImportByData(ctx *gin.Context, req *models.PluginImportByDataRequest) error {
+	// 验证密钥
+	key, err := ioutil.ReadFile("PLUGINKEY")
+	if err != nil {
+		return fmt.Errorf("failed to read plugin key: %w", err)
+	}
+	if req.Key != strings.TrimSpace(string(key)) {
+		return fmt.Errorf("invalid plugin key")
+	}
+
+	// 解析info.json的json字符串
+	var pluginInfo models.PluginInfo
+	if err := json.Unmarshal([]byte(req.JSON), &pluginInfo); err != nil {
+		return fmt.Errorf("解析 json 字符串失败: %w", err)
+	}
+
+	// 校验关键信息
+	if pluginInfo.Name == "" || pluginInfo.Module == "" {
+		return fmt.Errorf("json 中缺少 name 或 module 字段")
+	}
+
+	// 如果hash为空，生成新的hash
+	if pluginInfo.Hash == "" {
+		pluginInfo.Hash = generatePluginHash(32)
+	}
+
+	// 验证module是否合法
+	var pluginsModules = make(map[string]bool)
+	for _, module := range constants.PLUGINSMODULES {
+		pluginsModules[module] = true
+	}
+	if !pluginsModules[pluginInfo.Module] {
+		return fmt.Errorf("模块非法: %s", pluginInfo.Module)
+	}
+
+	var PLUGINS = make(map[string]bool)
+	for _, p := range constants.Plugins {
+		PLUGINS[p.Hash] = true
+	}
+	// 6. 插件是否是系统插件 或 module 不合法
+	if PLUGINS[pluginInfo.Hash] {
+		req.IsSystem = true
+	}
+	// 创建插件对象
+	p := &models.Plugin{
+		Name:          pluginInfo.Name,
+		Module:        pluginInfo.Module,
+		Hash:          pluginInfo.Hash,
+		Parameter:     pluginInfo.Parameter,
+		Help:          pluginInfo.Help,
+		Introduction:  pluginInfo.Introduction,
+		ParameterList: pluginInfo.ParameterList,
+		Source:        req.Source,
+		Version:       pluginInfo.Version,
+		IsSystem:      req.IsSystem,
+	}
+
+	// 使用upsert：如果存在则更新，不存在则插入
+	pluginID, err := s.repo.UpsertByHash(ctx, p)
+	if err != nil {
+		return fmt.Errorf("failed to upsert plugin: %w", err)
+	}
+
+	// 如果不是内置插件，需要RefreshConfig
+	if !req.IsSystem {
+		go func() {
+			msg := models.Message{
+				Name:    "all",
+				Type:    "install_plugin",
+				Content: fmt.Sprintf(`%v`, pluginID),
+			}
+			err = s.nodeService.RefreshConfig(ctx, msg)
+			if err != nil {
+				logger.Error("failed to refresh config", zap.Error(err))
+			}
+		}()
+	}
+
 	return nil
 }
 

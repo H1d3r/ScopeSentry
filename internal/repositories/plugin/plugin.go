@@ -21,8 +21,11 @@ type Repository interface {
 	FindWithPagination(ctx context.Context, query bson.M, opts *options.FindOptions) ([]models.Plugin, error)
 	FindByModule(ctx context.Context, module string) ([]models.Plugin, error)
 	FindByID(ctx context.Context, id primitive.ObjectID) (*models.Plugin, error)
+	FindByHash(ctx context.Context, hash string) (*models.Plugin, error)
 	Create(ctx context.Context, plugin *models.Plugin) (string, error)
 	Update(ctx context.Context, id primitive.ObjectID, update bson.M) error
+	UpdateByHash(ctx context.Context, hash string, update bson.M) error
+	UpsertByHash(ctx context.Context, plugin *models.Plugin) (string, error)
 	DeleteByHash(ctx context.Context, hashes []string) error
 	Count(ctx context.Context, query bson.M) (int64, error)
 	GetLogs(ctx context.Context, key string) (string, error)
@@ -95,6 +98,19 @@ func (r *repository) FindByID(ctx context.Context, id primitive.ObjectID) (*mode
 	return &result, nil
 }
 
+// FindByHash 根据hash查询插件
+func (r *repository) FindByHash(ctx context.Context, hash string) (*models.Plugin, error) {
+	var result models.Plugin
+	err := r.collection.FindOne(ctx, bson.M{"hash": hash}).Decode(&result)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to find document: %w", err)
+	}
+	return &result, nil
+}
+
 // Create 创建插件
 func (r *repository) Create(ctx context.Context, plugin *models.Plugin) (string, error) {
 	result, err := r.collection.InsertOne(ctx, plugin)
@@ -116,6 +132,30 @@ func (r *repository) Update(ctx context.Context, id primitive.ObjectID, update b
 		return fmt.Errorf("failed to update document: %w", err)
 	}
 	return nil
+}
+
+// UpdateByHash 根据hash更新插件
+func (r *repository) UpdateByHash(ctx context.Context, hash string, update bson.M) error {
+	_, err := r.collection.UpdateOne(ctx, bson.M{"hash": hash}, bson.M{"$set": update})
+	if err != nil {
+		return fmt.Errorf("failed to update document: %w", err)
+	}
+	return nil
+}
+
+// UpsertByHash 根据hash插入或更新插件（如果存在则更新，不存在则插入）
+func (r *repository) UpsertByHash(ctx context.Context, plugin *models.Plugin) (string, error) {
+	opts := options.FindOneAndReplace().
+		SetUpsert(true).
+		SetReturnDocument(options.After)
+
+	var result models.Plugin
+	err := r.collection.FindOneAndReplace(ctx, bson.M{"hash": plugin.Hash}, plugin, opts).Decode(&result)
+	if err != nil {
+		return "", fmt.Errorf("failed to upsert document: %w", err)
+	}
+
+	return result.ID.Hex(), nil
 }
 
 // DeleteByHash 根据哈希删除插件

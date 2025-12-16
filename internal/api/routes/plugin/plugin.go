@@ -92,6 +92,18 @@ func RegisterPluginRoutes(api *gin.RouterGroup) {
 				Handler:     plugin.CheckKey,
 				Middlewares: common.WithAuth(),
 			},
+			{
+				Method:      "POST",
+				Path:        "/remote/search",
+				Handler:     plugin.SearchRemotePlugins,
+				Middlewares: common.WithAuth(),
+			},
+			{
+				Method:      "POST",
+				Path:        "/import/data",
+				Handler:     plugin.ImportByData,
+				Middlewares: common.WithAuth(),
+			},
 		},
 	}
 

@@ -96,14 +96,23 @@ type PluginKeyCheckRequest struct {
 	Key string `json:"key" binding:"required"`
 }
 
+// PluginImportByDataRequest 通过POST JSON数据导入插件请求
+type PluginImportByDataRequest struct {
+	JSON     string `json:"json" `    // info.json的完整序列化json字符串
+	Source   string `json:"source" `  // plugin.go的完整源代码内容
+	IsSystem bool   `json:"isSystem"` // 是否为内置插件
+	Key      string `json:"key"`      // 插件密钥
+}
+
 type PluginInfo struct {
-	Help         string `json:"help"`
-	Parameter    string `json:"parameter"`
-	Module       string `json:"module"`
-	Name         string `json:"name"`
-	Version      string `json:"version"`
-	Introduction string `json:"introduction"`
-	Hash         string `json:"hash"`
+	Help          string `json:"help"`
+	Parameter     string `json:"parameter"`
+	Module        string `json:"module"`
+	Name          string `json:"name"`
+	Version       string `json:"version"`
+	Introduction  string `json:"introduction"`
+	Hash          string `json:"hash"`
+	ParameterList string `json:"parameterList"`
 
 	// 以下是程序运行时动态添加的字段，可选
 	Source   string `json:"source,omitempty"`

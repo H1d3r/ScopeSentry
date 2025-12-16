@@ -339,3 +339,45 @@ func CheckKey(c *gin.Context) {
 
 	response.Success(c, nil, "api.success")
 }
+
+// SearchRemotePlugins 搜索远程插件
+// @Summary 搜索远程插件
+// @Description 获取远程插件列表，并标记已安装和需要更新的插件
+// @Tags 插件管理
+// @Accept json
+// @Produce json
+// @Success 200 {object} response.Response{data=map[string]interface{}}
+// @Router /api/plugin/remote/search [post]
+func SearchRemotePlugins(c *gin.Context) {
+	result, err := pluginService.SearchRemotePlugins(c)
+	if err != nil {
+		response.InternalServerError(c, "api.error", err)
+		return
+	}
+
+	response.Success(c, result, "api.success")
+}
+
+// ImportByData 通过POST JSON数据导入插件
+// @Summary 通过POST JSON数据导入插件
+// @Description 通过POST传输JSON数据导入插件，包含info.json的序列化字符串、source字段和isSystem字段
+// @Tags 插件管理
+// @Accept json
+// @Produce json
+// @Param request body models.PluginImportByDataRequest true "请求参数"
+// @Success 200 {object} response.Response
+// @Router /api/plugin/import/data [post]
+func ImportByData(c *gin.Context) {
+	var req models.PluginImportByDataRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "api.bad_request", err)
+		return
+	}
+
+	if err := pluginService.ImportByData(c, &req); err != nil {
+		response.InternalServerError(c, "api.plugin.key.error", err)
+		return
+	}
+
+	response.Success(c, nil, "api.success")
+}
