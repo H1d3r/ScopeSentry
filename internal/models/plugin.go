@@ -15,6 +15,8 @@ type Plugin struct {
 	Hash          string             `json:"hash"`
 	Parameter     string             `json:"parameter"`
 	Help          string             `json:"help"`
+	Status        bool               `json:"status"`
+	Type          string             `bson:"type" json:"type"`
 	Introduction  string             `json:"introduction"`
 	ParameterList string             `json:"parameterList"`
 	IsSystem      bool               `json:"isSystem"`
@@ -26,6 +28,7 @@ type Plugin struct {
 type PluginListRequest struct {
 	PageIndex int    `json:"pageIndex" binding:"required,min=1"`
 	PageSize  int    `json:"pageSize" binding:"required,min=1"`
+	Type      string `json:"type"`
 	Search    string `json:"search"`
 }
 
@@ -44,7 +47,7 @@ type PluginDetailRequest struct {
 type PluginSaveRequest struct {
 	ID            string `json:"id"`
 	Name          string `json:"name" binding:"required"`
-	Module        string `json:"module" binding:"required"`
+	Module        string `json:"module"`
 	Hash          string `json:"hash"`
 	Parameter     string `json:"parameter"`
 	Help          string `json:"help"`
@@ -53,6 +56,7 @@ type PluginSaveRequest struct {
 	Source        string `json:"source"`
 	Version       string `json:"version"`
 	IsSystem      bool   `json:"isSystem"`
+	Type          string `json:"type"`
 	Key           string `json:"key" binding:"required"`
 }
 
@@ -102,6 +106,12 @@ type PluginImportByDataRequest struct {
 	Source   string `json:"source" `  // plugin.go的完整源代码内容
 	IsSystem bool   `json:"isSystem"` // 是否为内置插件
 	Key      string `json:"key"`      // 插件密钥
+}
+
+// PluginStatusRequest 插件状态更新请求
+type PluginStatusRequest struct {
+	ID     string `json:"id"`     // 插件ID
+	Status bool   `json:"status"` // 插件状态
 }
 
 type PluginInfo struct {

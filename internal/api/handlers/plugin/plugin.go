@@ -381,3 +381,27 @@ func ImportByData(c *gin.Context) {
 
 	response.Success(c, nil, "api.success")
 }
+
+// Status 更新插件状态
+// @Summary 更新插件状态
+// @Description 更新指定插件的启用/禁用状态
+// @Tags 插件管理
+// @Accept json
+// @Produce json
+// @Param request body models.PluginStatusRequest true "请求参数"
+// @Success 200 {object} response.Response
+// @Router /api/plugin/status [post]
+func Status(c *gin.Context) {
+	var req models.PluginStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "api.bad_request", err)
+		return
+	}
+
+	if err := pluginService.UpdateStatus(c, &req); err != nil {
+		response.InternalServerError(c, "api.error", err)
+		return
+	}
+
+	response.Success(c, nil, "api.success")
+}

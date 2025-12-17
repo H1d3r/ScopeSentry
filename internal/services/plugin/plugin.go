@@ -47,6 +47,7 @@ type Service interface {
 	CheckKey(ctx *gin.Context, req *models.PluginKeyCheckRequest) error
 	SearchRemotePlugins(ctx *gin.Context) (map[string]interface{}, error)
 	ImportByData(ctx *gin.Context, req *models.PluginImportByDataRequest) error
+	UpdateStatus(ctx *gin.Context, req *models.PluginStatusRequest) error
 }
 
 // service 实现插件服务接口
@@ -66,6 +67,13 @@ func NewService() Service {
 // List 获取插件列表
 func (s *service) List(ctx *gin.Context, req *models.PluginListRequest) (*models.PluginListResponse, error) {
 	query := bson.M{}
+	if req.Type != "all" {
+		if req.Type == "scan" {
+			query["type"] = bson.M{"$ne": "server"}
+		} else {
+			query["type"] = req.Type
+		}
+	}
 	if req.Search != "" {
 		query["name"] = bson.M{"$regex": req.Search, "$options": "i"}
 	}
@@ -132,23 +140,27 @@ func (s *service) Save(ctx *gin.Context, req *models.PluginSaveRequest) error {
 			Source:        req.Source,
 			Version:       req.Version,
 			ParameterList: req.ParameterList,
+			Status:        true,
+			Type:          req.Type,
 			IsSystem:      false,
 		}
 		id, err := s.repo.Create(ctx, plugin)
 		if err != nil {
 			return fmt.Errorf("failed to create plugin: %w", err)
 		}
-		go func() {
-			msg := models.Message{
-				Name:    "all",
-				Type:    "install_plugin",
-				Content: fmt.Sprintf(`%v`, id),
-			}
-			err = s.nodeService.RefreshConfig(ctx, msg)
-			if err != nil {
-				logger.Error("failed to refresh config", zap.Error(err))
-			}
-		}()
+		if req.Type == "scan" {
+			go func() {
+				msg := models.Message{
+					Name:    "all",
+					Type:    "install_plugin",
+					Content: fmt.Sprintf(`%v`, id),
+				}
+				err = s.nodeService.RefreshConfig(ctx, msg)
+				if err != nil {
+					logger.Error("failed to refresh config", zap.Error(err))
+				}
+			}()
+		}
 		return nil
 	} else {
 		// 更新现有插件
@@ -171,19 +183,19 @@ func (s *service) Save(ctx *gin.Context, req *models.PluginSaveRequest) error {
 		if err != nil {
 			return err
 		}
-
-		go func() {
-			msg := models.Message{
-				Name:    "all",
-				Type:    "install_plugin",
-				Content: fmt.Sprintf(`%v`, req.ID),
-			}
-			err = s.nodeService.RefreshConfig(ctx, msg)
-			if err != nil {
-				logger.Error("failed to refresh config", zap.Error(err))
-			}
-		}()
-
+		if req.Type == "scan" {
+			go func() {
+				msg := models.Message{
+					Name:    "all",
+					Type:    "install_plugin",
+					Content: fmt.Sprintf(`%v`, req.ID),
+				}
+				err = s.nodeService.RefreshConfig(ctx, msg)
+				if err != nil {
+					logger.Error("failed to refresh config", zap.Error(err))
+				}
+			}()
+		}
 		return nil
 	}
 }
@@ -665,4 +677,22 @@ func generatePluginHash(length int) string {
 
 	// 返回十六进制字符串
 	return hex.EncodeToString(hash[:])
+}
+
+// UpdateStatus 更新插件状态
+func (s *service) UpdateStatus(ctx *gin.Context, req *models.PluginStatusRequest) error {
+	id, err := primitive.ObjectIDFromHex(req.ID)
+	if err != nil {
+		return fmt.Errorf("invalid id format: %w", err)
+	}
+
+	update := bson.M{
+		"status": req.Status,
+	}
+	err = s.repo.Update(ctx, id, update)
+	if err != nil {
+		return fmt.Errorf("failed to update plugin status: %w", err)
+	}
+
+	return nil
 }
