@@ -19,32 +19,32 @@ type Response struct {
 
 // SuccessResponse 成功响应示例
 type SuccessResponse struct {
-	Code    int         `json:"code" example:"200"`     // 成功状态码
+	Code    int         `json:"code" example:"200"`         // 成功状态码
 	Message string      `json:"message" example:"操作成功"` // 成功消息
-	Data    interface{} `json:"data,omitempty"`         // 响应数据
+	Data    interface{} `json:"data,omitempty"`             // 响应数据
 }
 
 // BadRequestResponse 请求错误响应示例
 type BadRequestResponse struct {
-	Code    int    `json:"code" example:"400"`     // 请求错误状态码
+	Code    int    `json:"code" example:"400"`         // 请求错误状态码
 	Message string `json:"message" example:"请求错误"` // 错误消息
 }
 
 // UnauthorizedResponse 未授权响应示例
 type UnauthorizedResponse struct {
-	Code    int    `json:"code" example:"401"`      // 未授权状态码
+	Code    int    `json:"code" example:"401"`           // 未授权状态码
 	Message string `json:"message" example:"未授权访问"` // 错误消息
 }
 
 // NotFoundResponse 未找到响应示例
 type NotFoundResponse struct {
-	Code    int    `json:"code" example:"404"`      // 未找到状态码
+	Code    int    `json:"code" example:"404"`           // 未找到状态码
 	Message string `json:"message" example:"资源未找到"` // 错误消息
 }
 
 // InternalServerErrorResponse 服务器错误响应示例
 type InternalServerErrorResponse struct {
-	Code    int    `json:"code" example:"500"`        // 服务器错误状态码
+	Code    int    `json:"code" example:"500"`               // 服务器错误状态码
 	Message string `json:"message" example:"服务器内部错误"` // 错误消息
 }
 
@@ -84,6 +84,7 @@ func BadRequest(c *gin.Context, msgKey string, err error) {
 	c.JSON(http.StatusBadRequest, Response{
 		Code:    http.StatusBadRequest,
 		Message: i18n.Translate(getLocale(c), msgKey),
+		Data:    err.Error(),
 	})
 }
 

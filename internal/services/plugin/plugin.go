@@ -133,7 +133,7 @@ func (s *service) Save(ctx *gin.Context, req *models.PluginSaveRequest) error {
 		plugin := &models.Plugin{
 			Name:          req.Name,
 			Module:        req.Module,
-			Hash:          generatePluginHash(32),
+			Hash:          generatePluginHash(32, req.Type),
 			Parameter:     req.Parameter,
 			Help:          req.Help,
 			Introduction:  req.Introduction,
@@ -307,11 +307,15 @@ func (s *service) Import(ctx *gin.Context, filePath string, reqKey string) error
 	}
 
 	// 5. 校验 info.json 的关键信息
-	if pluginInfo.Name == "" || pluginInfo.Module == "" {
-		return fmt.Errorf("info.json 缺少 name 或 module 字段")
+	if pluginInfo.Name == "" {
+		return fmt.Errorf("info.json 缺少 name字段")
 	}
+	if pluginInfo.Module == "" && pluginInfo.Type == "scan" {
+		return fmt.Errorf("info.json 缺少 module字段")
+	}
+
 	if pluginInfo.Hash == "" {
-		pluginInfo.Hash = generatePluginHash(32)
+		pluginInfo.Hash = generatePluginHash(32, pluginInfo.Type)
 	}
 	var PLUGINS = make(map[string]bool)
 	for _, p := range constants.Plugins {
@@ -325,10 +329,11 @@ func (s *service) Import(ctx *gin.Context, filePath string, reqKey string) error
 	for _, module := range constants.PLUGINSMODULES {
 		pluginsModules[module] = true
 	}
-	if !pluginsModules[pluginInfo.Module] {
-		return fmt.Errorf("模块非法: %s", pluginInfo.Module)
+	if pluginInfo.Type == "scan" {
+		if !pluginsModules[pluginInfo.Module] {
+			return fmt.Errorf("模块非法: %s", pluginInfo.Module)
+		}
 	}
-
 	// 7. 设置其他字段
 	pluginInfo.Source = pluginSource
 	pluginInfo.IsSystem = false
@@ -347,6 +352,7 @@ func (s *service) Import(ctx *gin.Context, filePath string, reqKey string) error
 		ParameterList: pluginInfo.ParameterList,
 		Source:        pluginInfo.Source,
 		Version:       pluginInfo.Version,
+		Type:          pluginInfo.Type,
 		IsSystem:      false,
 	}
 	id, err := s.repo.Create(ctx, p)
@@ -591,22 +597,27 @@ func (s *service) ImportByData(ctx *gin.Context, req *models.PluginImportByDataR
 	}
 
 	// 校验关键信息
-	if pluginInfo.Name == "" || pluginInfo.Module == "" {
-		return fmt.Errorf("json 中缺少 name 或 module 字段")
+	if pluginInfo.Name == "" {
+		return fmt.Errorf("json 中缺少 name 字段")
+	}
+	if pluginInfo.Type == "scan" && pluginInfo.Module == "" {
+		return fmt.Errorf("json 中缺少 Module 字段")
 	}
 
 	// 如果hash为空，生成新的hash
 	if pluginInfo.Hash == "" {
-		pluginInfo.Hash = generatePluginHash(32)
+		pluginInfo.Hash = generatePluginHash(32, pluginInfo.Type)
 	}
 
 	// 验证module是否合法
-	var pluginsModules = make(map[string]bool)
-	for _, module := range constants.PLUGINSMODULES {
-		pluginsModules[module] = true
-	}
-	if !pluginsModules[pluginInfo.Module] {
-		return fmt.Errorf("模块非法: %s", pluginInfo.Module)
+	if pluginInfo.Type == "scan" {
+		var pluginsModules = make(map[string]bool)
+		for _, module := range constants.PLUGINSMODULES {
+			pluginsModules[module] = true
+		}
+		if !pluginsModules[pluginInfo.Module] {
+			return fmt.Errorf("模块非法: %s", pluginInfo.Module)
+		}
 	}
 
 	var PLUGINS = make(map[string]bool)
@@ -629,6 +640,7 @@ func (s *service) ImportByData(ctx *gin.Context, req *models.PluginImportByDataR
 		Source:        req.Source,
 		Version:       pluginInfo.Version,
 		IsSystem:      req.IsSystem,
+		Type:          pluginInfo.Type,
 	}
 
 	// 使用upsert：如果存在则更新，不存在则插入
@@ -655,10 +667,10 @@ func (s *service) ImportByData(ctx *gin.Context, req *models.PluginImportByDataR
 	return nil
 }
 
-const pluginSalt = "ScopeSentry"
+const pluginSalt = "ScopeSentry_"
 const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-func generatePluginHash(length int) string {
+func generatePluginHash(length int, tp string) string {
 	// 初始化随机数种子
 	rand.Seed(time.Now().UnixNano())
 
@@ -670,7 +682,7 @@ func generatePluginHash(length int) string {
 	randomString := string(b)
 
 	// 拼接盐值
-	salted := randomString + pluginSalt
+	salted := randomString + pluginSalt + tp
 
 	// 计算 MD5
 	hash := md5.Sum([]byte(salted))

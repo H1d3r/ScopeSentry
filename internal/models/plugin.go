@@ -123,7 +123,7 @@ type PluginInfo struct {
 	Introduction  string `json:"introduction"`
 	Hash          string `json:"hash"`
 	ParameterList string `json:"parameterList"`
-
+	Type          string `json:"type"`
 	// 以下是程序运行时动态添加的字段，可选
 	Source   string `json:"source,omitempty"`
 	IsSystem bool   `json:"isSystem,omitempty"`
