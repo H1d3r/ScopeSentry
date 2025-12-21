@@ -1,6 +1,7 @@
 package root_domain
 
 import (
+	"context"
 	"fmt"
 	"github.com/Autumn-27/ScopeSentry/internal/bootstrap"
 	"github.com/Autumn-27/ScopeSentry/internal/models"
@@ -16,8 +17,8 @@ import (
 // Service 定义根域名服务接口
 type Service interface {
 	GetRootDomainData(ctx *gin.Context, query models.SearchRequest) (*models.RootDomainResponse, error)
-	GetTaskTarget(ctx *gin.Context, query models.SearchRequest) (string, error)
-	GetTaskTargetByIDs(ctx *gin.Context, ids []string) (string, error)
+	GetTaskTarget(ctx context.Context, query models.SearchRequest) (string, error)
+	GetTaskTargetByIDs(ctx context.Context, ids []string) (string, error)
 }
 
 type service struct {
@@ -31,7 +32,7 @@ func NewService() Service {
 	}
 }
 
-func (s *service) GetTaskTargetByIDs(ctx *gin.Context, ids []string) (string, error) {
+func (s *service) GetTaskTargetByIDs(ctx context.Context, ids []string) (string, error) {
 	if len(ids) == 0 {
 		return "", nil
 	}
@@ -56,7 +57,7 @@ func (s *service) GetTaskTargetByIDs(ctx *gin.Context, ids []string) (string, er
 	opts := options.Find().
 		SetProjection(projection)
 
-	rootDomains, err := s.rootDomainRepo.FindWithPagination(ctx.Request.Context(), filter, opts)
+	rootDomains, err := s.rootDomainRepo.FindWithPagination(ctx, filter, opts)
 	if err != nil {
 		return "", err
 	}
@@ -127,7 +128,7 @@ func (s *service) GetRootDomainData(ctx *gin.Context, query models.SearchRequest
 	}, nil
 }
 
-func (s *service) GetTaskTarget(ctx *gin.Context, query models.SearchRequest) (string, error) {
+func (s *service) GetTaskTarget(ctx context.Context, query models.SearchRequest) (string, error) {
 	query.Index = "RootDomain"
 	searchQuery, err := helper.GetSearchQuery(query)
 	if err != nil {
@@ -146,7 +147,7 @@ func (s *service) GetTaskTarget(ctx *gin.Context, query models.SearchRequest) (s
 		opts = opts.SetLimit(int64(query.PageSize))
 	}
 
-	rootDomains, err := s.rootDomainRepo.FindWithPagination(ctx.Request.Context(), filter, opts)
+	rootDomains, err := s.rootDomainRepo.FindWithPagination(ctx, filter, opts)
 	if err != nil {
 		return "", err
 	}

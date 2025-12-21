@@ -110,6 +110,12 @@ func RegisterPluginRoutes(api *gin.RouterGroup) {
 				Handler:     plugin.Status,
 				Middlewares: common.WithAuth(),
 			},
+			{
+				Method:      "POST",
+				Path:        "/run",
+				Handler:     plugin.Run,
+				Middlewares: common.WithAuth(),
+			},
 		},
 	}
 

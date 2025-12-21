@@ -163,7 +163,9 @@ func GetLogs(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, result, "api.success")
+	response.Success(c, gin.H{
+		"data": result,
+	}, "api.success")
 }
 
 // CleanLogs 清理插件日志
@@ -399,6 +401,30 @@ func Status(c *gin.Context) {
 	}
 
 	if err := pluginService.UpdateStatus(c, &req); err != nil {
+		response.InternalServerError(c, "api.error", err)
+		return
+	}
+
+	response.Success(c, nil, "api.success")
+}
+
+// Run 运行插件一次
+// @Summary 运行插件一次
+// @Description 手动触发执行指定的服务端插件
+// @Tags 插件管理
+// @Accept json
+// @Produce json
+// @Param request body models.PluginRunRequest true "请求参数"
+// @Success 200 {object} response.Response
+// @Router /api/plugin/run [post]
+func Run(c *gin.Context) {
+	var req models.PluginRunRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "api.bad_request", err)
+		return
+	}
+
+	if err := pluginService.Run(c, &req); err != nil {
 		response.InternalServerError(c, "api.error", err)
 		return
 	}

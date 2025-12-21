@@ -1,6 +1,7 @@
 package poc
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -153,7 +154,7 @@ func DeletePoc(c *gin.Context) {
 // @Success 200 {object} response.Response{data=map[string]interface{}}
 // @Router /poc/data/all [get]
 func GetAllPocData(c *gin.Context) {
-	result, err := pocService.GetAllPocData(c)
+	result, err := pocService.GetAllPocData(context.Background())
 	if err != nil {
 		logger.Error(fmt.Sprintf("GetAllPocData error %v", err))
 		response.InternalServerError(c, "api.error", err)

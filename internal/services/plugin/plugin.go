@@ -17,16 +17,24 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Autumn-27/ScopeSentry/internal/plugins"
+	schedulerCore "github.com/Autumn-27/ScopeSentry/internal/scheduler"
+
 	"github.com/Autumn-27/ScopeSentry/internal/constants"
+	"github.com/Autumn-27/ScopeSentry/internal/database/mongodb"
+	"github.com/Autumn-27/ScopeSentry/internal/database/redis"
 	"github.com/Autumn-27/ScopeSentry/internal/logger"
 	"github.com/Autumn-27/ScopeSentry/internal/models"
+	"github.com/Autumn-27/ScopeSentry/internal/options"
 	"github.com/Autumn-27/ScopeSentry/internal/repositories/plugin"
 	"github.com/Autumn-27/ScopeSentry/internal/services/node"
+	"github.com/Autumn-27/ScopeSentry/internal/services/poc"
+	taskCommon "github.com/Autumn-27/ScopeSentry/internal/services/task/common"
 	"github.com/gin-gonic/gin"
 	"github.com/valyala/fasthttp"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	mongoOptions "go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
 )
 
@@ -48,6 +56,7 @@ type Service interface {
 	SearchRemotePlugins(ctx *gin.Context) (map[string]interface{}, error)
 	ImportByData(ctx *gin.Context, req *models.PluginImportByDataRequest) error
 	UpdateStatus(ctx *gin.Context, req *models.PluginStatusRequest) error
+	Run(ctx *gin.Context, req *models.PluginRunRequest) error
 }
 
 // service 实现插件服务接口
@@ -68,7 +77,7 @@ func NewService() Service {
 func (s *service) List(ctx *gin.Context, req *models.PluginListRequest) (*models.PluginListResponse, error) {
 	query := bson.M{}
 	if req.Type != "all" {
-		if req.Type == "scan" {
+		if req.Type != "server" {
 			query["type"] = bson.M{"$ne": "server"}
 		} else {
 			query["type"] = req.Type
@@ -78,7 +87,7 @@ func (s *service) List(ctx *gin.Context, req *models.PluginListRequest) (*models
 		query["name"] = bson.M{"$regex": req.Search, "$options": "i"}
 	}
 
-	opts := options.Find().
+	opts := mongoOptions.Find().
 		SetSkip(int64((req.PageIndex - 1) * req.PageSize)).
 		SetLimit(int64(req.PageSize))
 
@@ -148,7 +157,7 @@ func (s *service) Save(ctx *gin.Context, req *models.PluginSaveRequest) error {
 		if err != nil {
 			return fmt.Errorf("failed to create plugin: %w", err)
 		}
-		if req.Type == "scan" {
+		if req.Type != "server" {
 			go func() {
 				msg := models.Message{
 					Name:    "all",
@@ -159,6 +168,10 @@ func (s *service) Save(ctx *gin.Context, req *models.PluginSaveRequest) error {
 				if err != nil {
 					logger.Error("failed to refresh config", zap.Error(err))
 				}
+			}()
+		} else {
+			go func() {
+				RegisterPlugin(plugin.Source, plugin.Hash)
 			}()
 		}
 		return nil
@@ -183,7 +196,7 @@ func (s *service) Save(ctx *gin.Context, req *models.PluginSaveRequest) error {
 		if err != nil {
 			return err
 		}
-		if req.Type == "scan" {
+		if req.Type != "server" {
 			go func() {
 				msg := models.Message{
 					Name:    "all",
@@ -194,6 +207,15 @@ func (s *service) Save(ctx *gin.Context, req *models.PluginSaveRequest) error {
 				if err != nil {
 					logger.Error("failed to refresh config", zap.Error(err))
 				}
+			}()
+		} else {
+			go func() {
+				loadPlugin, err := plugins.LoadPlugin(req.Source, req.Hash)
+				if err != nil {
+					logger.Error("failed to load plugin", zap.Error(err))
+					return
+				}
+				plugins.GlobalPluginManager.RegisterPlugin(req.Hash, loadPlugin)
 			}()
 		}
 		return nil
@@ -206,14 +228,16 @@ func (s *service) Delete(ctx *gin.Context, req *models.PluginDeleteRequest) erro
 	for _, item := range req.Data {
 		hashes = append(hashes, item.Hash)
 		go func() {
-			msg := models.Message{
-				Name:    "all",
-				Type:    "delete_plugin",
-				Content: fmt.Sprintf(`%v_%v`, item.Hash, item.Module),
-			}
-			err := s.nodeService.RefreshConfig(ctx, msg)
-			if err != nil {
-				logger.Error("failed to refresh config", zap.Error(err))
+			if item.Module != "" {
+				msg := models.Message{
+					Name:    "all",
+					Type:    "delete_plugin",
+					Content: fmt.Sprintf(`%v_%v`, item.Hash, item.Module),
+				}
+				err := s.nodeService.RefreshConfig(ctx, msg)
+				if err != nil {
+					logger.Error("failed to refresh config", zap.Error(err))
+				}
 			}
 		}()
 	}
@@ -222,10 +246,12 @@ func (s *service) Delete(ctx *gin.Context, req *models.PluginDeleteRequest) erro
 
 // GetLogs 获取插件日志
 func (s *service) GetLogs(ctx *gin.Context, req *models.PluginLogRequest) (string, error) {
-	if req.Module == "" || req.Hash == "" {
-		return "", fmt.Errorf("module and hash are required")
+	logKey := ""
+	if req.Type == "server" {
+		logKey = fmt.Sprintf("logs:server_plugins:%v", req.Hash)
+	} else {
+		logKey = fmt.Sprintf("logs:plugins:%v:%v", req.Module, req.Hash)
 	}
-	logKey := fmt.Sprintf("logs:plugins:%v:%v", req.Module, req.Hash)
 	logs, err := s.repo.GetLogs(ctx, logKey)
 	if err != nil {
 		return "", err
@@ -310,7 +336,7 @@ func (s *service) Import(ctx *gin.Context, filePath string, reqKey string) error
 	if pluginInfo.Name == "" {
 		return fmt.Errorf("info.json 缺少 name字段")
 	}
-	if pluginInfo.Module == "" && pluginInfo.Type == "scan" {
+	if pluginInfo.Module == "" && pluginInfo.Type != "server" {
 		return fmt.Errorf("info.json 缺少 module字段")
 	}
 
@@ -329,7 +355,7 @@ func (s *service) Import(ctx *gin.Context, filePath string, reqKey string) error
 	for _, module := range constants.PLUGINSMODULES {
 		pluginsModules[module] = true
 	}
-	if pluginInfo.Type == "scan" {
+	if pluginInfo.Type != "server" {
 		if !pluginsModules[pluginInfo.Module] {
 			return fmt.Errorf("模块非法: %s", pluginInfo.Module)
 		}
@@ -360,16 +386,22 @@ func (s *service) Import(ctx *gin.Context, filePath string, reqKey string) error
 		return fmt.Errorf("failed to create plugin: %w", err)
 	}
 	go func() {
-		msg := models.Message{
-			Name:    "all",
-			Type:    "install_plugin",
-			Content: fmt.Sprintf(`%v`, id),
-		}
-		err = s.nodeService.RefreshConfig(ctx, msg)
-		if err != nil {
-			logger.Error("failed to refresh config", zap.Error(err))
+		if pluginInfo.Type != "server" {
+			msg := models.Message{
+				Name:    "all",
+				Type:    "install_plugin",
+				Content: fmt.Sprintf(`%v`, id),
+			}
+			err = s.nodeService.RefreshConfig(ctx, msg)
+			if err != nil {
+				logger.Error("failed to refresh config", zap.Error(err))
+			}
 		}
 	}()
+	if pluginInfo.Type == "server" {
+		RegisterPlugin(pluginInfo.Source, pluginInfo.Hash)
+	}
+
 	return nil
 }
 
@@ -378,14 +410,24 @@ func (s *service) Reinstall(ctx *gin.Context, req *models.PluginReinstallRequest
 	if req.Node == "" {
 		req.Node = "all"
 	}
-	msg := models.Message{
-		Name:    req.Node,
-		Type:    "re_install_plugin",
-		Content: fmt.Sprintf(`%v_%v`, req.Hash, req.Module),
-	}
-	err := s.nodeService.RefreshConfig(ctx, msg)
-	if err != nil {
-		logger.Error("failed to refresh config", zap.Error(err))
+	if req.Module == "" {
+		// 说明是服务端插件
+		plg, flag := plugins.GlobalPluginManager.GetPlugin(req.Hash)
+		if !flag {
+			logger.Error(fmt.Sprintf("<UNK> plugin %s <UNK>", req.Hash))
+			return fmt.Errorf("<UNK> plugin %s <UNK>", req.Hash)
+		}
+		plg.Install()
+	} else {
+		msg := models.Message{
+			Name:    req.Node,
+			Type:    "re_install_plugin",
+			Content: fmt.Sprintf(`%v_%v`, req.Hash, req.Module),
+		}
+		err := s.nodeService.RefreshConfig(ctx, msg)
+		if err != nil {
+			logger.Error("failed to refresh config", zap.Error(err))
+		}
 	}
 	return nil
 }
@@ -479,7 +521,7 @@ func (s *service) SearchRemotePlugins(ctx *gin.Context) (map[string]interface{},
 	go func() {
 		defer wg.Done()
 		query := bson.M{}
-		opts := options.Find()
+		opts := mongoOptions.Find()
 		installedPlugins, installedErr = s.repo.FindWithPagination(ctx, query, opts)
 	}()
 
@@ -600,7 +642,7 @@ func (s *service) ImportByData(ctx *gin.Context, req *models.PluginImportByDataR
 	if pluginInfo.Name == "" {
 		return fmt.Errorf("json 中缺少 name 字段")
 	}
-	if pluginInfo.Type == "scan" && pluginInfo.Module == "" {
+	if pluginInfo.Type != "server" && pluginInfo.Module == "" {
 		return fmt.Errorf("json 中缺少 Module 字段")
 	}
 
@@ -610,7 +652,7 @@ func (s *service) ImportByData(ctx *gin.Context, req *models.PluginImportByDataR
 	}
 
 	// 验证module是否合法
-	if pluginInfo.Type == "scan" {
+	if pluginInfo.Type != "server" {
 		var pluginsModules = make(map[string]bool)
 		for _, module := range constants.PLUGINSMODULES {
 			pluginsModules[module] = true
@@ -650,7 +692,7 @@ func (s *service) ImportByData(ctx *gin.Context, req *models.PluginImportByDataR
 	}
 
 	// 如果不是内置插件，需要RefreshConfig
-	if !req.IsSystem {
+	if !req.IsSystem && pluginInfo.Type != "server" {
 		go func() {
 			msg := models.Message{
 				Name:    "all",
@@ -662,6 +704,9 @@ func (s *service) ImportByData(ctx *gin.Context, req *models.PluginImportByDataR
 				logger.Error("failed to refresh config", zap.Error(err))
 			}
 		}()
+	}
+	if pluginInfo.Type == "server" {
+		RegisterPlugin(pluginInfo.Source, pluginInfo.Hash)
 	}
 
 	return nil
@@ -693,18 +738,87 @@ func generatePluginHash(length int, tp string) string {
 
 // UpdateStatus 更新插件状态
 func (s *service) UpdateStatus(ctx *gin.Context, req *models.PluginStatusRequest) error {
-	id, err := primitive.ObjectIDFromHex(req.ID)
-	if err != nil {
-		return fmt.Errorf("invalid id format: %w", err)
-	}
 
+	if req.Status {
+		plg, flag := plugins.GlobalPluginManager.GetPlugin(req.ID)
+		if !flag {
+			logger.Error(fmt.Sprintf("failed to get plugin status: %v", req.ID))
+			return fmt.Errorf("failed to get plugin: %v", req.ID)
+		}
+		if plg.Cycle() != "" {
+			err := AddJob(plg.GetPluginId(), plg.Cycle())
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		err := schedulerCore.GetGlobalScheduler().RemoveJob(req.ID)
+		if err != nil {
+			logger.Error(fmt.Sprintf("failed to remove job: %v", err))
+			return err
+		}
+	}
 	update := bson.M{
 		"status": req.Status,
 	}
-	err = s.repo.Update(ctx, id, update)
+	err := s.repo.UpdateByHash(ctx, req.ID, update)
 	if err != nil {
 		return fmt.Errorf("failed to update plugin status: %w", err)
 	}
+
+	return nil
+}
+
+// Run 运行插件一次
+func (s *service) Run(ctx *gin.Context, req *models.PluginRunRequest) error {
+	// 从 GlobalPluginManager 获取插件实例
+	plgRunner, flag := plugins.GlobalPluginManager.GetPlugin(req.Hash)
+	if !flag {
+		// 从数据库获取插件信息
+		plg, err := s.repo.FindByHash(ctx, req.Hash)
+		if err != nil {
+			return fmt.Errorf("failed to find plugin: %w", err)
+		}
+		if plg == nil {
+			return fmt.Errorf("plugin not found")
+		}
+
+		// 只允许运行服务端插件
+		if plg.Type != "server" {
+			return fmt.Errorf("only server plugins can be run manually")
+		}
+		// 如果插件未加载，则加载它
+		plugin, err := plugins.LoadPlugin(plg.Source, plg.Hash)
+		if err != nil {
+			return fmt.Errorf("failed to load plugin: %w", err)
+		}
+		plugins.GlobalPluginManager.RegisterPlugin(req.Hash, plugin)
+		err = plugin.Install()
+		if err != nil {
+			logger.Error(fmt.Sprintf("failed to install plugin: %v", err))
+			return fmt.Errorf("failed to install plugin: %w", err)
+		}
+		plgRunner = plugin.Clone()
+	}
+
+	// 构建 PluginOption
+	pluginOption := options.PluginOption{
+		DB:                mongodb.DB,
+		RedisClinet:       redis.Client,
+		TaskCommonService: taskCommon.NewService(),
+		Node:              node.NewService(),
+		PocService:        poc.NewService(),
+	}
+
+	// 执行插件
+	plgRunner.Log("plugin is running manually")
+	err := plgRunner.Execute(pluginOption)
+	if err != nil {
+		logger.Error(fmt.Sprintf("plugin execution error: %v", err))
+		plgRunner.Log(fmt.Sprintf("plugin execution error: %v", err), "e")
+		return fmt.Errorf("plugin execution failed: %w", err)
+	}
+	plgRunner.Log("plugin execution completed")
 
 	return nil
 }

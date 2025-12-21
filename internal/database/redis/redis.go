@@ -38,3 +38,11 @@ func Close() error {
 	}
 	return nil
 }
+
+func SendPluginLogToRedis(key string, msg string) error {
+	_, err := Client.RPush(context.Background(), key, msg).Result()
+	if err != nil {
+		return fmt.Errorf("failed to add values to list: %v", err)
+	}
+	return nil
+}

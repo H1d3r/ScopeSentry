@@ -138,7 +138,7 @@ func AddTask(c *gin.Context) {
 	}
 
 	// 创建任务
-	_, err = commonService.Insert(c, &req)
+	_, err = commonService.Insert(context.Background(), &req)
 	if err != nil {
 		logger.Error(fmt.Sprintf("AddTask %v", err))
 		response.InternalServerError(c, "api.error", err)

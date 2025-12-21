@@ -9,7 +9,11 @@ package utils
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"os"
+	"path/filepath"
+	"time"
 )
 
 func EnsureDir(path string) error {
@@ -50,4 +54,52 @@ func WriteFile(filePath string, content []byte) error {
 	}
 
 	return nil
+}
+
+func DownloadFile(url string, savePath string, timeout time.Duration) error {
+	// 创建目录
+	if err := os.MkdirAll(filepath.Dir(savePath), os.ModePerm); err != nil {
+		return err
+	}
+
+	client := &http.Client{
+		Timeout: timeout, // 整体超时（连接 + 下载）
+	}
+
+	resp, err := client.Get(url)
+	if err != nil {
+		return fmt.Errorf("请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("HTTP 状态码异常: %d", resp.StatusCode)
+	}
+
+	out, err := os.Create(savePath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	return err
+}
+
+func DeleteFile(filePath string) {
+	// 检查文件是否存在
+	if filePath == "" {
+		return
+	}
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return
+	} else if err != nil {
+		return
+	}
+
+	// 文件存在，进行删除
+	err := os.Remove(filePath)
+	if err != nil {
+		return
+	}
 }

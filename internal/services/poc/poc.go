@@ -1,6 +1,7 @@
 package poc
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -31,8 +32,9 @@ type Service interface {
 	UpdatePoc(ctx *gin.Context, req *models.PocUpdateRequest) error
 	AddPoc(ctx *gin.Context, req *models.PocAddRequest) error
 	DeletePoc(ctx *gin.Context, req *models.PocDeleteRequest) error
-	GetAllPocData(ctx *gin.Context) ([]models.Poc, error)
-	ImportPoc(ctx *gin.Context, filePath string) (*models.PocImportResponse, error)
+	GetAllPocData(ctx context.Context) ([]models.Poc, error)
+	ImportPoc(ctx context.Context, filePath string) (*models.PocImportResponse, error)
+	TemplateIdExists(ctx context.Context, templateId string) (bool, error)
 }
 
 type service struct {
@@ -205,7 +207,7 @@ func (s *service) DeletePoc(ctx *gin.Context, req *models.PocDeleteRequest) erro
 	return nil
 }
 
-func (s *service) GetAllPocData(ctx *gin.Context) ([]models.Poc, error) {
+func (s *service) GetAllPocData(ctx context.Context) ([]models.Poc, error) {
 	result, err := s.repo.GetAllPocData(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all poc data: %w", err)
@@ -214,7 +216,7 @@ func (s *service) GetAllPocData(ctx *gin.Context) ([]models.Poc, error) {
 }
 
 // ImportPoc 导入POC文件
-func (s *service) ImportPoc(ctx *gin.Context, filePath string) (*models.PocImportResponse, error) {
+func (s *service) ImportPoc(ctx context.Context, filePath string) (*models.PocImportResponse, error) {
 	logger.Info("POC导入开始")
 
 	// 生成随机文件名
@@ -347,6 +349,11 @@ func (s *service) ImportPoc(ctx *gin.Context, filePath string) (*models.PocImpor
 		RepeatNum:  repeatNum,
 		Message:    "import success",
 	}, nil
+}
+
+// TemplateIdExists 高性能检查TemplateId是否存在
+func (s *service) TemplateIdExists(ctx context.Context, templateId string) (bool, error) {
+	return s.repo.TemplateIdExists(ctx, templateId)
 }
 
 // extractZipFile 解压ZIP文件并返回YAML文件列表

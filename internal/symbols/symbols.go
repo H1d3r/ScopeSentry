@@ -6,6 +6,10 @@
 // -------------------------------------------
 
 //go:generate yaegi extract github.com/Autumn-27/ScopeSentry/internal/options
+//go:generate yaegi extract github.com/Autumn-27/ScopeSentry/internal/utils
+//go:generate yaegi extract github.com/Autumn-27/ScopeSentry/internal/utils/random
+//go:generate yaegi extract github.com/Autumn-27/ScopeSentry/internal/utils/helper
+//go:generate yaegi extract github.com/Autumn-27/ScopeSentry/internal/models
 package symbols
 
 import (

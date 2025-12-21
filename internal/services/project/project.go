@@ -20,7 +20,7 @@ import (
 type Service interface {
 	GetProjectsByTag(ctx *gin.Context) ([]models.TagGroup, error)
 	GetTarget(ctx *gin.Context, id string) (string, error)
-	GetTargets(ctx *gin.Context, ids []string) (string, error)
+	GetTargets(ctx context.Context, ids []string) (string, error)
 
 	GetProjectsData(ctx *gin.Context, search string, pageIndex, pageSize int) (models.ProjectListResponse, error)
 	GetProjectContent(ctx *gin.Context, id string) (*models.ProjectContentResponse, error)
@@ -86,7 +86,7 @@ func (s *service) GetTarget(ctx *gin.Context, id string) (string, error) {
 	return s.projectRepo.GetTarget(ctx, id)
 }
 
-func (s *service) GetTargets(ctx *gin.Context, ids []string) (string, error) {
+func (s *service) GetTargets(ctx context.Context, ids []string) (string, error) {
 	return s.projectRepo.GetTargets(ctx, ids)
 }
 

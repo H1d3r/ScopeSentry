@@ -23,6 +23,7 @@ type Repository interface {
 	DeleteMany(ctx context.Context, filter bson.M) (*mongo.DeleteResult, error)
 	GetAllPocData(ctx context.Context) ([]models.Poc, error)
 	GetAllTemplateId(ctx context.Context) ([]string, error)
+	TemplateIdExists(ctx context.Context, templateId string) (bool, error)
 }
 
 type repository struct {
@@ -87,10 +88,11 @@ func (r *repository) DeleteMany(ctx context.Context, filter bson.M) (*mongo.Dele
 func (r *repository) GetAllPocData(ctx context.Context) ([]models.Poc, error) {
 	// 设置投影，只返回需要的字段
 	projection := bson.M{
-		"_id":  1,
-		"name": 1,
-		"time": 1,
-		"tags": 1,
+		"_id":         1,
+		"name":        1,
+		"time":        1,
+		"tags":        1,
+		"Template ID": 1,
 	}
 
 	opts := options.Find().SetProjection(projection)
@@ -137,4 +139,15 @@ func (r *repository) GetAllTemplateId(ctx context.Context) ([]string, error) {
 	}
 
 	return hashes, nil
+}
+
+// TemplateIdExists 高性能检查TemplateId是否存在
+// 使用CountDocuments而不是FindOne，因为只需要知道是否存在，不需要返回文档
+func (r *repository) TemplateIdExists(ctx context.Context, templateId string) (bool, error) {
+	filter := bson.M{"id": templateId}
+	count, err := r.collection.CountDocuments(ctx, filter, options.Count().SetLimit(1))
+	if err != nil {
+		return false, fmt.Errorf("failed to check template id existence: %w", err)
+	}
+	return count > 0, nil
 }

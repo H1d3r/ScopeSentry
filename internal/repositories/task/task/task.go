@@ -27,7 +27,7 @@ type Repository interface {
 	Count(ctx *gin.Context, filter interface{}) (int64, error)
 	Find(ctx context.Context, filter interface{}, opts *options.FindOptions) ([]models.Task, error)
 	FindByID(ctx context.Context, id primitive.ObjectID) (*models.Task, error)
-	Insert(ctx *gin.Context, task *models.Task) (string, error) // 新增方法
+	Insert(ctx context.Context, task *models.Task) (string, error) // 新增方法
 	ClearTaskCache(ctx context.Context, id string) error
 	PushTaskInfoList(ctx context.Context, id string, targetList []string) error
 	FindTemplateByID(ctx context.Context, id string) (*models.ScanTemplate, error)
@@ -92,8 +92,8 @@ func (r *repository) FindByID(ctx context.Context, id primitive.ObjectID) (*mode
 }
 
 // Insert 插入一个新任务文档
-func (r *repository) Insert(ctx *gin.Context, task *models.Task) (string, error) {
-	result, err := r.db.Collection("task").InsertOne(context.Background(), task)
+func (r *repository) Insert(ctx context.Context, task *models.Task) (string, error) {
+	result, err := r.db.Collection("task").InsertOne(ctx, task)
 	if err != nil {
 		return "", err
 	}

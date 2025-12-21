@@ -70,6 +70,9 @@ func InitializeGlobalScheduler() {
 		globalScheduler.RegisterHandler("page_monitoring", func(params string, nextTime string) error {
 			return jobs.CreatePageMonitoringTask()
 		})
+		globalScheduler.RegisterHandler("server_plugin", func(params string, nextTime string) error {
+			return jobs.ServerPluginRunner(params, nextTime)
+		})
 	})
 }
 

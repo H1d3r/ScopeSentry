@@ -8,15 +8,26 @@
 package plugins
 
 import (
+	"github.com/Autumn-27/ScopeSentry/internal/database/mongodb"
 	"github.com/Autumn-27/ScopeSentry/internal/interfaces"
+	"github.com/Autumn-27/ScopeSentry/internal/logger"
 	"github.com/Autumn-27/ScopeSentry/internal/options"
+	"github.com/Autumn-27/ScopeSentry/internal/symbols"
 	"github.com/traefik/yaegi/interp"
 	"github.com/traefik/yaegi/stdlib"
+	"go.mongodb.org/mongo-driver/bson"
+	mongoOptions "go.mongodb.org/mongo-driver/mongo/options"
+	"gopkg.in/yaml.v3"
 	"reflect"
 	"sync"
 )
 
-func LoadPlugin(code string, plgId string) (interfaces.Plugin, error) {
+func init() {
+	GlobalPluginManager = NewPluginManager()
+	InstallPlugin()
+}
+
+func LoadPlugin(code string, plgHash string) (interfaces.Plugin, error) {
 	// 初始化 yaegi 解释器
 	interp := interp.New(interp.Options{})
 	// 加载标准库和符号
@@ -24,9 +35,22 @@ func LoadPlugin(code string, plgId string) (interfaces.Plugin, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = interp.Use(symbols.Symbols)
+	if err != nil {
+		return nil, err
+	}
 	err = interp.Use(map[string]map[string]reflect.Value{
 		"os/exec": stdlib.Symbols["os/exec"],
 	})
+	err = interp.Use(map[string]map[string]reflect.Value{
+		"gopkg.in/yaml.v3": {
+			"Marshal":   reflect.ValueOf(yaml.Marshal),
+			"Unmarshal": reflect.ValueOf(yaml.Unmarshal),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
 	_, err = interp.Eval(code)
 	if err != nil {
 		return nil, err
@@ -59,7 +83,7 @@ func LoadPlugin(code string, plgId string) (interfaces.Plugin, error) {
 	}
 	getNameFunc := v.Interface().(func() string)
 
-	plg := NewPlugin(plgId, installFunc, executeFunc, getNameFunc, cycleFunc)
+	plg := NewPlugin(plgHash, installFunc, executeFunc, getNameFunc, cycleFunc)
 
 	return plg, err
 }
@@ -88,5 +112,51 @@ func (pm *PluginManager) GetPlugin(id string) (interfaces.Plugin, bool) {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
 
-	return pm.plugins[id].Clone(), true
+	plugin, ok := pm.plugins[id]
+	if !ok || plugin == nil {
+		return nil, false
+	}
+
+	return plugin.Clone(), true
+}
+
+type PluginInfo struct {
+	Hash   string `bson:"hash"`
+	Source string `bson:"source"`
+}
+
+func InstallPlugin() {
+	var result []PluginInfo
+	opts := mongoOptions.Find().
+		SetProjection(bson.M{
+			"module": 1,
+			"hash":   1,
+			"source": 1,
+			"_id":    0,
+		})
+	err := mongodb.FindMany(
+		"plugins",
+		bson.M{
+			"type": "server",
+		},
+		&result,
+		opts,
+	)
+	if err != nil {
+		logger.Error(err.Error())
+		return
+	}
+	for _, plugin := range result {
+		loadPlugin, err := LoadPlugin(plugin.Source, plugin.Hash)
+		if err != nil {
+			logger.Error(err.Error())
+			return
+		}
+		GlobalPluginManager.RegisterPlugin(plugin.Hash, loadPlugin)
+		err = loadPlugin.Install()
+		if err != nil {
+			logger.Error(err.Error())
+			return
+		}
+	}
 }

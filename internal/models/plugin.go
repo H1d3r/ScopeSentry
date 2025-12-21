@@ -17,6 +17,8 @@ type Plugin struct {
 	Help          string             `json:"help"`
 	Status        bool               `json:"status"`
 	Type          string             `bson:"type" json:"type"`
+	LastTime      string             `bson:"lastTime" json:"lastTime"`
+	NextTime      string             `bson:"nextTime" json:"nextTime"`
 	Introduction  string             `json:"introduction"`
 	ParameterList string             `json:"parameterList"`
 	IsSystem      bool               `json:"isSystem"`
@@ -70,15 +72,16 @@ type PluginDeleteRequest struct {
 
 // PluginLogRequest 插件日志请求
 type PluginLogRequest struct {
-	Module string `json:"module" binding:"required"`
+	Module string `json:"module"`
 	Hash   string `json:"hash" binding:"required"`
+	Type   string `json:"type"`
 }
 
 // PluginReinstallRequest 插件重装请求
 type PluginReinstallRequest struct {
-	Node   string `json:"node" binding:"required"`
-	Hash   string `json:"hash" binding:"required"`
-	Module string `json:"module" binding:"required"`
+	Node   string `json:"node"`
+	Hash   string `json:"hash"`
+	Module string `json:"module"`
 }
 
 // PluginRecheckRequest 插件重检请求
@@ -112,6 +115,11 @@ type PluginImportByDataRequest struct {
 type PluginStatusRequest struct {
 	ID     string `json:"id"`     // 插件ID
 	Status bool   `json:"status"` // 插件状态
+}
+
+// PluginRunRequest 插件运行请求
+type PluginRunRequest struct {
+	Hash string `json:"hash" binding:"required"` // 插件Hash
 }
 
 type PluginInfo struct {

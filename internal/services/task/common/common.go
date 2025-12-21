@@ -22,7 +22,6 @@ import (
 	"github.com/Autumn-27/ScopeSentry/internal/services/node"
 	"github.com/Autumn-27/ScopeSentry/internal/services/project"
 	"github.com/Autumn-27/ScopeSentry/internal/utils/helper"
-	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"regexp"
 	"strings"
@@ -30,7 +29,7 @@ import (
 
 // Service 定义任务服务接口
 type Service interface {
-	Insert(ctx *gin.Context, task *models.Task) (string, error)
+	Insert(ctx context.Context, task *models.Task) (string, error)
 	CreateTaskScan(ctx context.Context, task models.Task, id string, stopToStart bool) (int64, error)
 	GetScanTemplate(ctx context.Context, task *models.Task) (*models.ScanTemplate, error)
 	ParameterParser(ctx context.Context, parameters models.Parameters) (models.Parameters, error)
@@ -62,7 +61,7 @@ func NewService() Service {
 	}
 }
 
-func (s *service) Insert(ctx *gin.Context, task *models.Task) (string, error) {
+func (s *service) Insert(ctx context.Context, task *models.Task) (string, error) {
 	// task.TargetSource 分为普通、从资产选择数据进行创建（支持资产、根域名、子域名、url 这里修改原始逻辑 统一为后边的情况）、从项目、从资产、从根域名、从子域名、从url
 	var query models.SearchRequest
 	var target string

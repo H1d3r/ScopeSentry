@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/Autumn-27/ScopeSentry/internal/utils/helper"
-	"github.com/gin-gonic/gin"
 
 	"github.com/Autumn-27/ScopeSentry/internal/models"
 	"github.com/Autumn-27/ScopeSentry/internal/repositories/assets/subdomain"
@@ -17,8 +16,8 @@ import (
 // Service 定义子域名服务接口
 type Service interface {
 	GetSubdomains(ctx context.Context, query models.SearchRequest) ([]models.Subdomain, error)
-	GetTaskTarget(ctx *gin.Context, query models.SearchRequest) (string, error)
-	GetTaskTargetByIDs(ctx *gin.Context, ids []string) (string, error)
+	GetTaskTarget(ctx context.Context, query models.SearchRequest) (string, error)
+	GetTaskTargetByIDs(ctx context.Context, ids []string) (string, error)
 }
 
 type service struct {
@@ -32,7 +31,7 @@ func NewService() Service {
 	}
 }
 
-func (s *service) GetTaskTargetByIDs(ctx *gin.Context, ids []string) (string, error) {
+func (s *service) GetTaskTargetByIDs(ctx context.Context, ids []string) (string, error) {
 	if len(ids) == 0 {
 		return "", nil
 	}
@@ -57,7 +56,7 @@ func (s *service) GetTaskTargetByIDs(ctx *gin.Context, ids []string) (string, er
 	opts := options.Find().
 		SetProjection(projection)
 
-	subDomains, err := s.repo.FindWithPagination(ctx.Request.Context(), filter, opts)
+	subDomains, err := s.repo.FindWithPagination(ctx, filter, opts)
 	if err != nil {
 		return "", err
 	}
@@ -102,7 +101,7 @@ func (s *service) GetSubdomains(ctx context.Context, query models.SearchRequest)
 	return s.repo.FindWithPagination(ctx, filter, opts)
 }
 
-func (s *service) GetTaskTarget(ctx *gin.Context, query models.SearchRequest) (string, error) {
+func (s *service) GetTaskTarget(ctx context.Context, query models.SearchRequest) (string, error) {
 	query.Index = "subdomain"
 	searchQuery, err := helper.GetSearchQuery(query)
 	if err != nil {
@@ -121,7 +120,7 @@ func (s *service) GetTaskTarget(ctx *gin.Context, query models.SearchRequest) (s
 		opts = opts.SetLimit(int64(query.PageSize))
 	}
 
-	subDomains, err := s.repo.FindWithPagination(ctx.Request.Context(), filter, opts)
+	subDomains, err := s.repo.FindWithPagination(ctx, filter, opts)
 	if err != nil {
 		return "", err
 	}

@@ -28,8 +28,8 @@ type Service interface {
 	GetChangeLog(ctx *gin.Context, id string) ([]models.AssetChangeLog, error)
 	DeduplicateAssets(ctx *gin.Context, assetType string, filter bson.M, groupFields []string) error
 	GetAssetCardData(ctx *gin.Context, query models.SearchRequest) ([]models.Asset, error)
-	GetTaskTarget(ctx *gin.Context, query models.SearchRequest) (string, error)
-	GetTaskTargetByIDs(ctx *gin.Context, ids []string) (string, error)
+	GetTaskTarget(ctx context.Context, query models.SearchRequest) (string, error)
+	GetTaskTargetByIDs(ctx context.Context, ids []string) (string, error)
 	BuildSearchQuery(query models.SearchRequest) (map[string]interface{}, error)
 	GetHostsByRootDomain(ctx *gin.Context, rootDomain string, pageIndex, pageSize int) ([]string, int64, error)
 	GetAssetsByHost(ctx *gin.Context, host string, pageIndex, pageSize int) ([]models.Asset, int64, error)
@@ -365,7 +365,7 @@ func (s *service) GetAssetCardData(ctx *gin.Context, query models.SearchRequest)
 	return assets, nil
 }
 
-func (s *service) GetTaskTarget(ctx *gin.Context, query models.SearchRequest) (string, error) {
+func (s *service) GetTaskTarget(ctx context.Context, query models.SearchRequest) (string, error) {
 	query.Index = "asset"
 	searchQuery, err := s.BuildSearchQuery(query)
 	if err != nil {
@@ -388,7 +388,7 @@ func (s *service) GetTaskTarget(ctx *gin.Context, query models.SearchRequest) (s
 		opts = opts.SetLimit(int64(query.PageSize))
 	}
 
-	assets, err := s.assetRepo.FindWithOptions(ctx.Request.Context(), filter, opts)
+	assets, err := s.assetRepo.FindWithOptions(ctx, filter, opts)
 	if err != nil {
 		return "", err
 	}
@@ -413,7 +413,7 @@ func (s *service) GetTaskTarget(ctx *gin.Context, query models.SearchRequest) (s
 	return builder.String(), nil
 }
 
-func (s *service) GetTaskTargetByIDs(ctx *gin.Context, ids []string) (string, error) {
+func (s *service) GetTaskTargetByIDs(ctx context.Context, ids []string) (string, error) {
 	assets, err := s.assetRepo.GetAssetByIDs(ctx, ids)
 	if err != nil {
 		return "", err

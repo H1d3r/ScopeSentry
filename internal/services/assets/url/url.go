@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/Autumn-27/ScopeSentry/internal/utils/helper"
-	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/Autumn-27/ScopeSentry/internal/models"
@@ -16,8 +15,8 @@ import (
 
 type Service interface {
 	GetURLs(ctx context.Context, query models.SearchRequest) ([]models.URL, error)
-	GetTaskTarget(ctx *gin.Context, query models.SearchRequest) (string, error)
-	GetTaskTargetByIDs(ctx *gin.Context, ids []string) (string, error)
+	GetTaskTarget(ctx context.Context, query models.SearchRequest) (string, error)
+	GetTaskTargetByIDs(ctx context.Context, ids []string) (string, error)
 }
 
 type service struct {
@@ -30,7 +29,7 @@ func NewService() Service {
 	}
 }
 
-func (s *service) GetTaskTargetByIDs(ctx *gin.Context, ids []string) (string, error) {
+func (s *service) GetTaskTargetByIDs(ctx context.Context, ids []string) (string, error) {
 	if len(ids) == 0 {
 		return "", nil
 	}
@@ -55,7 +54,7 @@ func (s *service) GetTaskTargetByIDs(ctx *gin.Context, ids []string) (string, er
 	opts := options.Find().
 		SetProjection(projection)
 
-	urlResults, err := s.repo.Find(ctx.Request.Context(), filter, opts)
+	urlResults, err := s.repo.Find(ctx, filter, opts)
 	if err != nil {
 		return "", err
 	}
@@ -110,7 +109,7 @@ func (s *service) GetURLs(ctx context.Context, query models.SearchRequest) ([]mo
 	return s.repo.Find(ctx, filter, opts)
 }
 
-func (s *service) GetTaskTarget(ctx *gin.Context, query models.SearchRequest) (string, error) {
+func (s *service) GetTaskTarget(ctx context.Context, query models.SearchRequest) (string, error) {
 	query.Index = "UrlScan"
 	searchQuery, err := helper.GetSearchQuery(query)
 	if err != nil {
@@ -129,7 +128,7 @@ func (s *service) GetTaskTarget(ctx *gin.Context, query models.SearchRequest) (s
 		opts = opts.SetLimit(int64(query.PageSize))
 	}
 
-	urlResults, err := s.repo.Find(ctx.Request.Context(), filter, opts)
+	urlResults, err := s.repo.Find(ctx, filter, opts)
 	if err != nil {
 		return "", err
 	}

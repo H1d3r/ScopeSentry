@@ -9,8 +9,11 @@ package plugins
 
 import (
 	"fmt"
+	"github.com/Autumn-27/ScopeSentry/internal/database/redis"
 	"github.com/Autumn-27/ScopeSentry/internal/interfaces"
+	"github.com/Autumn-27/ScopeSentry/internal/logger"
 	"github.com/Autumn-27/ScopeSentry/internal/options"
+	"github.com/Autumn-27/ScopeSentry/internal/utils/helper"
 )
 
 type Plugin struct {
@@ -41,6 +44,9 @@ func (p *Plugin) Install() error {
 }
 
 func (p *Plugin) Execute(op options.PluginOption) error {
+	op.GetStringVariable = GetStringVariable
+	op.SetStringVariable = SetStringVariable
+	op.Log = p.Log
 	return p.ExecuteFunc(op)
 }
 
@@ -49,7 +55,33 @@ func (p *Plugin) GetName() string {
 }
 
 func (p *Plugin) Log(msg string, tp ...string) {
-	fmt.Printf("dd")
+	var logTp string
+	if len(tp) > 0 {
+		logTp = tp[0] // 使用传入的参数
+	} else {
+		logTp = "i"
+	}
+
+	switch logTp {
+	case "i":
+		logger.Info(msg)
+		msg = "[info] " + msg
+	case "e":
+		logger.Error(msg)
+		msg = "[error] " + msg
+	case "d":
+		logger.Debug(msg)
+		msg = "[debug] " + msg
+	case "w":
+		logger.Warn(msg)
+		msg = "[warning] " + msg
+
+	}
+	key := fmt.Sprintf("logs:server_plugins:%v", p.Id)
+	err := redis.SendPluginLogToRedis(key, fmt.Sprintf("[%v] %v", helper.GetNowTimeString(), msg))
+	if err != nil {
+		logger.Error(err.Error())
+	}
 }
 func (p *Plugin) GetPluginId() string {
 	return p.Id
