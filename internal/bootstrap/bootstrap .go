@@ -3,7 +3,10 @@ package bootstrap
 import (
 	"context"
 	"fmt"
+	"github.com/Autumn-27/ScopeSentry/internal/config"
 	"github.com/Autumn-27/ScopeSentry/internal/database/mongodb"
+	"go.mongodb.org/mongo-driver/bson"
+	mongoOptions "go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"time"
 )
@@ -60,6 +63,16 @@ func init() {
 	//// 初始化数据库
 	RegisterStartupEvent(func(ctx context.Context) error {
 		return mongodb.CreateDatabase()
+	})
+
+	// 初始化通知接口
+	RegisterStartupEvent(func(ctx context.Context) error {
+		opts := mongoOptions.Find().
+			SetProjection(bson.M{"_id": 0, "method": 1, "url": 1, "contentType": 1, "data": 1, "state": 1})
+		if err := mongodb.FindMany("notification", bson.M{"state": true}, &config.NotificationApi, opts); err != nil {
+			return err
+		}
+		return nil
 	})
 
 	// 这里可以添加更多的启动事件
