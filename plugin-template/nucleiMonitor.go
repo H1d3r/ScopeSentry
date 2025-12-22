@@ -22,8 +22,6 @@ import (
 	"github.com/Autumn-27/ScopeSentry/internal/utils/helper"
 
 	"github.com/Autumn-27/ScopeSentry/internal/models"
-	"gopkg.in/yaml.v3"
-
 	"github.com/Autumn-27/ScopeSentry/internal/options"
 	"github.com/Autumn-27/ScopeSentry/internal/utils"
 	"github.com/Autumn-27/ScopeSentry/internal/utils/random"
@@ -108,24 +106,26 @@ func Execute(op options.PluginOption) error {
 				op.Log("所有 poc 已更新完毕")
 				return nil
 			}
-			op.Log(fmt.Sprintf("发现新的 POC: TemplateID=%s, Name=%s, Severity=%s", result.TemplateID, result.Name, result.Severity))
 			var pt models.PocTemplate
-			err = yaml.Unmarshal([]byte(result.Raw), &pt)
+			err = utils.Unmarshal([]byte(result.Raw), &pt)
 			if err != nil {
 				return fmt.Errorf("failed to unmarshal poc template: %w", err)
 			}
+			var searchValueOld interface{}
+			var customQuery string
 			if pt.Info.Metadata != nil {
-				var customQuery string
 				// 先尝试从 fofa-query 解析
 				if fofaQueryValue := pt.Info.Metadata["fofa-query"]; fofaQueryValue != nil {
+					searchValueOld = fofaQueryValue
 					customQuery = helper.ConvertFofaToCustomQuery(fofaQueryValue)
-					op.Log(fmt.Sprintf("Fofa:%v 转换后的搜索语句: %s", fofaQueryValue, customQuery))
+					//op.Log(fmt.Sprintf("Fofa:%v 转换后的搜索语句: %s", fofaQueryValue, customQuery))
 				}
 				// 如果 fofa 解析结果为空，尝试从 shodan-query 解析
 				if customQuery == "" {
 					if shodanQueryValue := pt.Info.Metadata["shodan-query"]; shodanQueryValue != nil {
+						searchValueOld = shodanQueryValue
 						customQuery = helper.ConvertShodanToCustomQuery(shodanQueryValue)
-						op.Log(fmt.Sprintf("Shodan:%v 转换后的搜索语句: %s", shodanQueryValue, customQuery))
+						//op.Log(fmt.Sprintf("Shodan:%v 转换后的搜索语句: %s", shodanQueryValue, customQuery))
 					}
 				}
 				if customQuery != "" {
@@ -133,6 +133,7 @@ func Execute(op options.PluginOption) error {
 				}
 			}
 
+			op.Log(fmt.Sprintf("发现新的 POC: TemplateID=%s, Name=%s, Severity=%s, OldSearch=%v, SaSSearch=%v", result.TemplateID, result.Name, result.Severity, searchValueOld, customQuery))
 		}
 
 		// 如果返回的结果数量小于 limit，说明已经是最后一页

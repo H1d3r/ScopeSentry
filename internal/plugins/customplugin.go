@@ -94,5 +94,6 @@ func (p *Plugin) Clone() interfaces.Plugin {
 		ExecuteFunc:     p.ExecuteFunc,
 		GetNameFunc:     p.GetNameFunc,
 		GetPluginIdFunc: p.GetPluginIdFunc,
+		CycleFunc:       p.CycleFunc,
 	}
 }

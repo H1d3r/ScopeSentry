@@ -13,6 +13,8 @@ func init() {
 		"DeleteFile":   reflect.ValueOf(utils.DeleteFile),
 		"DownloadFile": reflect.ValueOf(utils.DownloadFile),
 		"EnsureDir":    reflect.ValueOf(utils.EnsureDir),
+		"Marshal":      reflect.ValueOf(utils.Marshal),
+		"Unmarshal":    reflect.ValueOf(utils.Unmarshal),
 		"WriteFile":    reflect.ValueOf(utils.WriteFile),
 	}
 }

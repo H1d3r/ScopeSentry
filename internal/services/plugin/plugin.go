@@ -210,6 +210,7 @@ func (s *service) Save(ctx *gin.Context, req *models.PluginSaveRequest) error {
 			}()
 		} else {
 			go func() {
+				// server的时候id是插件的hash
 				loadPlugin, err := plugins.LoadPlugin(req.Source, req.Hash)
 				if err != nil {
 					logger.Error("failed to load plugin", zap.Error(err))
@@ -261,10 +262,15 @@ func (s *service) GetLogs(ctx *gin.Context, req *models.PluginLogRequest) (strin
 
 // CleanLogs 清理插件日志
 func (s *service) CleanLogs(ctx *gin.Context, req *models.PluginLogRequest) error {
-	if req.Module == "" || req.Hash == "" {
+	if req.Hash == "" {
 		return fmt.Errorf("module and hash are required")
 	}
-	logKey := fmt.Sprintf("logs:plugins:%v:%v", req.Module, req.Hash)
+	var logKey string
+	if req.Type == "server" {
+		logKey = fmt.Sprintf("logs:server_plugins:%v", req.Hash)
+	} else {
+		logKey = fmt.Sprintf("logs:plugins:%v:%v", req.Module, req.Hash)
+	}
 	err := s.repo.CleanLogs(ctx, logKey)
 	if err != nil {
 		return err

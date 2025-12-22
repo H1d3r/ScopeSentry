@@ -58,7 +58,7 @@ func ServerPluginRunner(id string, nextTime string) error {
 			}
 			plgRunner = plugin.Clone()
 		}
-		mongodb.UpdateOne("plugins", bson.M{"hash": id}, bson.M{"$set": bson.M{"lastTime": helper.GetNowTime(), "nextTime": nextTime}})
+		mongodb.UpdateOne("plugins", bson.M{"hash": id}, bson.M{"$set": bson.M{"lastTime": helper.GetNowTimeString(), "nextTime": nextTime}})
 		plgRunner.Log("plugin is running")
 		err := plgRunner.Execute(pluginOption)
 		if err != nil {

@@ -104,7 +104,7 @@ func NewPluginManager() *PluginManager {
 func (pm *PluginManager) RegisterPlugin(id string, plugin interfaces.Plugin) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-
+	delete(pm.plugins, id)
 	pm.plugins[id] = plugin
 }
 
