@@ -9,6 +9,7 @@ package plugins
 
 import (
 	"fmt"
+	"github.com/Autumn-27/ScopeSentry/internal/config"
 	"github.com/Autumn-27/ScopeSentry/internal/database/redis"
 	"github.com/Autumn-27/ScopeSentry/internal/interfaces"
 	"github.com/Autumn-27/ScopeSentry/internal/logger"
@@ -47,6 +48,7 @@ func (p *Plugin) Execute(op options.PluginOption) error {
 	op.GetStringVariable = GetStringVariable
 	op.SetStringVariable = SetStringVariable
 	op.Log = p.Log
+	op.Notification = config.Notification
 	return p.ExecuteFunc(op)
 }
 

@@ -114,6 +114,17 @@ func FindMany(col string, filter interface{}, result interface{}, opts ...*optio
 	return cursor.All(ctx, result)
 }
 
+func FindAll(collectionName string, query, selector, result interface{}) error {
+	collection := Collection(collectionName)
+	cur, err := collection.Find(context.Background(), query, options.Find().SetProjection(selector))
+	if err != nil {
+		return err
+	}
+	defer cur.Close(context.Background())
+
+	return cur.All(context.Background(), result)
+}
+
 // 更新一条
 func UpdateOne(col string, filter interface{}, update interface{}) (*mongo.UpdateResult, error) {
 	ctx, cancel := defaultContext()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Autumn-27/ScopeSentry/internal/database/mongodb"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/Autumn-27/ScopeSentry/internal/models"
 	"go.mongodb.org/mongo-driver/bson"
@@ -16,7 +17,7 @@ type Repository interface {
 	Find(ctx context.Context, filter bson.M, opts *options.FindOptions) ([]models.ScanTemplate, error)
 	FindOne(ctx context.Context, filter bson.M, opts *options.FindOneOptions) (*models.ScanTemplate, error)
 	Count(ctx context.Context, filter bson.M) (int64, error)
-	InsertOne(ctx context.Context, document interface{}) (interface{}, error)
+	InsertOne(ctx context.Context, document interface{}) (string, error)
 	UpdateOne(ctx context.Context, filter bson.M, update bson.M) error
 	DeleteMany(ctx context.Context, filter bson.M) error
 }
@@ -73,13 +74,15 @@ func (r *repository) Count(ctx context.Context, filter bson.M) (int64, error) {
 }
 
 // InsertOne 插入单个文档
-func (r *repository) InsertOne(ctx context.Context, document interface{}) (interface{}, error) {
+func (r *repository) InsertOne(ctx context.Context, document interface{}) (string, error) {
 	result, err := r.collection.InsertOne(ctx, document)
 	if err != nil {
-		return nil, fmt.Errorf("failed to insert document: %w", err)
+		return "", fmt.Errorf("failed to insert document: %w", err)
 	}
-
-	return result.InsertedID, nil
+	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
+		return oid.Hex(), nil
+	}
+	return "", nil
 }
 
 // UpdateOne 更新单个文档

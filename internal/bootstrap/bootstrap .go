@@ -6,7 +6,6 @@ import (
 	"github.com/Autumn-27/ScopeSentry/internal/config"
 	"github.com/Autumn-27/ScopeSentry/internal/database/mongodb"
 	"go.mongodb.org/mongo-driver/bson"
-	mongoOptions "go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"time"
 )
@@ -67,9 +66,7 @@ func init() {
 
 	// 初始化通知接口
 	RegisterStartupEvent(func(ctx context.Context) error {
-		opts := mongoOptions.Find().
-			SetProjection(bson.M{"_id": 0, "method": 1, "url": 1, "contentType": 1, "data": 1, "state": 1})
-		if err := mongodb.FindMany("notification", bson.M{"state": true}, &config.NotificationApi, opts); err != nil {
+		if err := mongodb.FindAll("notification", bson.M{"state": true}, bson.M{"_id": 0, "method": 1, "url": 1, "contentType": 1, "data": 1, "state": 1}, &config.NotificationApi); err != nil {
 			return err
 		}
 		return nil

@@ -24,4 +24,5 @@ type PluginOption struct {
 	SetStringVariable func(key string, value string)
 	GetStringVariable func(key string) (value string)
 	Log               func(msg string, tp ...string)
+	Notification      func(msg string)
 }

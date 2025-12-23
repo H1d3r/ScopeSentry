@@ -9,6 +9,8 @@ package configuration
 
 import (
 	"fmt"
+	"github.com/Autumn-27/ScopeSentry/internal/config"
+	"github.com/Autumn-27/ScopeSentry/internal/database/mongodb"
 	"github.com/Autumn-27/ScopeSentry/internal/logger"
 	assetCommon "github.com/Autumn-27/ScopeSentry/internal/services/assets/common"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -179,6 +181,9 @@ func (s *Service) UpdateNotification(ctx *gin.Context, data models.UpdateNotific
 		return err
 	}
 	_ = s.nodeService.RefreshConfig(ctx, models.Message{Name: "all", Type: "notification"})
+	if err := mongodb.FindAll("notification", bson.M{"state": true}, bson.M{"_id": 0, "method": 1, "url": 1, "contentType": 1, "data": 1, "state": 1}, &config.NotificationApi); err != nil {
+		return err
+	}
 	return nil
 }
 

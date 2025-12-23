@@ -52,6 +52,9 @@ func Install() error {
 	return nil
 }
 
+// CreatTask 是否自动创建任务
+var CreatTask = false
+
 func Execute(op options.PluginOption) error {
 	value := op.GetStringVariable("nuclei_init")
 	if value != "true" {
@@ -129,7 +132,13 @@ func Execute(op options.PluginOption) error {
 					}
 				}
 				if customQuery != "" {
-					// 在这里可以使用 customQuery 值进行后续处理
+					// 如果有搜索条件 且开启自动创建任务 则进行创建任务
+					//if CreatTask {
+					//	task := models.Task{
+					//
+					//	}
+					//	op.TaskCommonService.Insert()
+					//}
 				}
 			}
 
