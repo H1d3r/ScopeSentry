@@ -81,10 +81,14 @@ func Created(c *gin.Context, data interface{}, msgKey string) {
 }
 
 func BadRequest(c *gin.Context, msgKey string, err error) {
+	errMsg := ""
+	if err != nil {
+		errMsg = err.Error()
+	}
 	c.JSON(http.StatusBadRequest, Response{
 		Code:    http.StatusBadRequest,
 		Message: i18n.Translate(getLocale(c), msgKey),
-		Data:    err.Error(),
+		Data:    errMsg,
 	})
 }
 

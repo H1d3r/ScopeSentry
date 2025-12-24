@@ -10,29 +10,13 @@ package jobs
 import (
 	"fmt"
 	"github.com/Autumn-27/ScopeSentry/internal/database/mongodb"
-	"github.com/Autumn-27/ScopeSentry/internal/database/redis"
 	"github.com/Autumn-27/ScopeSentry/internal/logger"
 	"github.com/Autumn-27/ScopeSentry/internal/models"
 	"github.com/Autumn-27/ScopeSentry/internal/options"
 	"github.com/Autumn-27/ScopeSentry/internal/plugins"
-	"github.com/Autumn-27/ScopeSentry/internal/services/node"
-	"github.com/Autumn-27/ScopeSentry/internal/services/poc"
-	taskCommon "github.com/Autumn-27/ScopeSentry/internal/services/task/common"
 	"github.com/Autumn-27/ScopeSentry/internal/utils/helper"
 	"go.mongodb.org/mongo-driver/bson"
 )
-
-var pluginOption options.PluginOption
-
-func init() {
-	pluginOption = options.PluginOption{
-		DB:                mongodb.DB,
-		RedisClinet:       redis.Client,
-		TaskCommonService: taskCommon.NewService(),
-		Node:              node.NewService(),
-		PocService:        poc.NewService(),
-	}
-}
 
 func ServerPluginRunner(id string, nextTime string) error {
 	filter := bson.M{"hash": id}
@@ -60,7 +44,7 @@ func ServerPluginRunner(id string, nextTime string) error {
 		}
 		mongodb.UpdateOne("plugins", bson.M{"hash": id}, bson.M{"$set": bson.M{"lastTime": helper.GetNowTimeString(), "nextTime": nextTime}})
 		plgRunner.Log("plugin is running")
-		err := plgRunner.Execute(pluginOption)
+		err := plgRunner.Execute(options.PluginOptionInit)
 		if err != nil {
 			logger.Error(err.Error())
 			plgRunner.Log(fmt.Sprintf("plugin execution error: %v", err), "e")

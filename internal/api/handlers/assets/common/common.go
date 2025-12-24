@@ -157,7 +157,7 @@ func TotalData(c *gin.Context) {
 		return
 	}
 
-	count, err := commonService.TotalData(c, &req)
+	count, err := commonService.TotalData(c.Request.Context(), &req)
 	if err != nil {
 		switch err {
 		case common.ErrInvalidCollection:

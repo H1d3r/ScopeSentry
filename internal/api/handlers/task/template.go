@@ -100,7 +100,7 @@ func Save(c *gin.Context) {
 		return
 	}
 
-	_, err := templateService.Save(c, req.ID, &req.Result)
+	_, err := templateService.Save(c.Request.Context(), req.ID, &req.Result)
 	if err != nil {
 		response.InternalServerError(c, "api.error", err)
 		return

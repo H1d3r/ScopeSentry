@@ -113,7 +113,7 @@ func AddPoc(c *gin.Context) {
 		return
 	}
 
-	if err := pocService.AddPoc(c, &req); err != nil {
+	if _, err := pocService.AddPoc(c.Request.Context(), &req); err != nil {
 		response.InternalServerError(c, "api.error", err)
 		return
 	}

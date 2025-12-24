@@ -30,7 +30,7 @@ type Service interface {
 	GetPocList(ctx *gin.Context, req *models.PocListRequest) (*models.PocListResponse, error)
 	GetPocDetail(ctx *gin.Context, req *models.PocDetailRequest) (*models.Poc, error)
 	UpdatePoc(ctx *gin.Context, req *models.PocUpdateRequest) error
-	AddPoc(ctx *gin.Context, req *models.PocAddRequest) error
+	AddPoc(ctx context.Context, req *models.PocAddRequest) (string, error)
 	DeletePoc(ctx *gin.Context, req *models.PocDeleteRequest) error
 	GetAllPocData(ctx context.Context) ([]models.Poc, error)
 	ImportPoc(ctx context.Context, filePath string) (*models.PocImportResponse, error)
@@ -138,17 +138,17 @@ func (s *service) UpdatePoc(ctx *gin.Context, req *models.PocUpdateRequest) erro
 	return nil
 }
 
-func (s *service) AddPoc(ctx *gin.Context, req *models.PocAddRequest) error {
+func (s *service) AddPoc(ctx context.Context, req *models.PocAddRequest) (string, error) {
 
 	var pt models.PocTemplate
 	err := yaml.Unmarshal([]byte(req.Content), &pt)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal poc template: %w", err)
+		return "", fmt.Errorf("failed to unmarshal poc template: %w", err)
 	}
 	id := pt.ID
 	existing, err := s.repo.FindOne(ctx, bson.M{"id": id})
 	if err == nil && existing != nil {
-		return fmt.Errorf("poc already exists")
+		return "", fmt.Errorf("poc already exists")
 	}
 	ptTags := strings.Split(pt.Info.Tags, ",")
 	tags := helper.RemoveArrayDuplicates(ptTags)
@@ -163,20 +163,21 @@ func (s *service) AddPoc(ctx *gin.Context, req *models.PocAddRequest) error {
 
 	res, err := s.repo.InsertOne(ctx, doc)
 	if err != nil {
-		return fmt.Errorf("failed to add poc: %w", err)
+		return "", fmt.Errorf("failed to add poc: %w", err)
 	}
+	pocId := res.InsertedID.(primitive.ObjectID).Hex()
 	go func() {
 		msg := models.Message{
 			Name:    "all",
 			Type:    "poc",
-			Content: fmt.Sprintf(`add:%v`, res.InsertedID.(primitive.ObjectID).Hex()),
+			Content: fmt.Sprintf(`add:%v`, pocId),
 		}
 		err = s.nodeService.RefreshConfig(ctx, msg)
 		if err != nil {
 			logger.Error("failed to refresh config", zap.Error(err))
 		}
 	}()
-	return nil
+	return pocId, nil
 }
 
 func (s *service) DeletePoc(ctx *gin.Context, req *models.PocDeleteRequest) error {

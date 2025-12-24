@@ -53,7 +53,24 @@ func Install() error {
 }
 
 // CreatTask 是否自动创建任务
+// true: 自动创建任务（⚠️ 高风险）
+// false: 手动创建任务（✅ 推荐）
+//
+// ⚠️ 重要安全警告：
+// 1. 部分PoC可能包含数据删除、系统破坏等危险操作
+// 2. 自动执行可能对业务造成不可逆影响
+// 3. 建议始终设置为 false，在人工审核后手动创建任务
+//
+// 🔒 安全建议：
+// - 生产环境：务必设置为 false
+// - 测试环境：谨慎评估后再考虑开启
+// - 新PoC测试：必须先人工验证再执行
 var CreatTask = false
+
+// SkipScanName poc名称包含以下列表时会跳过该poc的扫描
+var SkipScanName = []string{
+	"WordPress",
+}
 
 func Execute(op options.PluginOption) error {
 	value := op.GetStringVariable("nuclei_init")
@@ -109,6 +126,16 @@ func Execute(op options.PluginOption) error {
 				op.Log("所有 poc 已更新完毕")
 				return nil
 			}
+
+			// 插入poc 获取pocid
+			pocID, err := op.PocService.AddPoc(context.Background(), &models.PocAddRequest{Content: result.Raw})
+			if err != nil {
+				op.Log(fmt.Sprintf("AddPoc error: %s", err.Error()), "e")
+				return err
+			}
+			// 给扫描端更新poc的时间
+			time.Sleep(3 * time.Second)
+
 			var pt models.PocTemplate
 			err = utils.Unmarshal([]byte(result.Raw), &pt)
 			if err != nil {
@@ -116,6 +143,8 @@ func Execute(op options.PluginOption) error {
 			}
 			var searchValueOld interface{}
 			var customQuery string
+			var scanStatus = "未创建"
+			var affectedAssetCount = int64(0)
 			if pt.Info.Metadata != nil {
 				// 先尝试从 fofa-query 解析
 				if fofaQueryValue := pt.Info.Metadata["fofa-query"]; fofaQueryValue != nil {
@@ -132,17 +161,67 @@ func Execute(op options.PluginOption) error {
 					}
 				}
 				if customQuery != "" {
+					// 获取影响数量
+					searchRequest := models.SearchRequest{
+						Index:            "asset",
+						SearchExpression: customQuery,
+					}
+					affectedAssetCount, err = op.AssetCommonService.TotalData(context.Background(), &searchRequest)
+					if err != nil {
+						return err
+					}
 					// 如果有搜索条件 且开启自动创建任务 则进行创建任务
-					//if CreatTask {
-					//	task := models.Task{
-					//
-					//	}
-					//	op.TaskCommonService.Insert()
-					//}
+					if CreatTask && affectedAssetCount != 0 {
+
+						// 判断poc是否是白名单
+						skipFlag := false
+						for _, v := range SkipScanName {
+							if strings.Contains(result.Name, strings.ToLower(v)) {
+								skipFlag = true
+								scanStatus = "跳过"
+								break
+							}
+						}
+						// 创建扫描模板
+						template := models.ScanTemplate{
+							Name:              fmt.Sprintf("nuclei-template-%v-%v", result.Name, helper.GetNowTimeString()),
+							VulnerabilityScan: []string{"ed93b8af6b72fe54a60efdb932cf6fbc"}, //nuclei
+							VulList:           []string{pocID},
+							Parameters: models.Parameters{
+								VulnerabilityScan: map[string]string{
+									"ed93b8af6b72fe54a60efdb932cf6fbc": "",
+								},
+							},
+						}
+						templateID, err := op.TemplateService.Save(context.Background(), "", &template)
+						if err != nil {
+							op.Log(fmt.Sprintf("<UNK> TemplateId <UNK>: %s, <UNK>: %s", pocID, err.Error()), "e")
+							return err
+						}
+
+						// 创建任务
+						if !skipFlag {
+							task := models.Task{
+								Name:           fmt.Sprintf("[nuclei plugin]-%v-%v", result.Name, helper.GetNowTimeString()),
+								AllNode:        true,
+								Duplicates:     "None",
+								ScheduledTasks: false,
+								Template:       templateID,
+								TargetSource:   "asset",
+								Search:         customQuery,
+							}
+							_, err := op.TaskCommonService.Insert(context.Background(), &task)
+							if err != nil {
+								return err
+							}
+							scanStatus = "创建成功"
+						}
+					}
 				}
 			}
-
-			op.Log(fmt.Sprintf("发现新的 POC: TemplateID=%s, Name=%s, Severity=%s, OldSearch=%v, SaSSearch=%v", result.TemplateID, result.Name, result.Severity, searchValueOld, customQuery))
+			op.Log(fmt.Sprintf("发现新的 POC: TemplateID=%s, Name=%s, Severity=%s, OldSearch=%v, SaSSearch=%v,影响资产数量:%v,任务创建状态:%v", result.TemplateID, result.Name, result.Severity, searchValueOld, customQuery, affectedAssetCount, scanStatus))
+			notificationMsg := fmt.Sprintf("发现新的 POC: \nTemplateID:%s\nName:%s\nSeverity:%s\nOldSearch:%v\nSaSSearch:%v\n影响资产数量:%v\n任务创建状态:%v", result.TemplateID, result.Name, result.Severity, searchValueOld, customQuery, affectedAssetCount, scanStatus)
+			op.Notification(notificationMsg)
 		}
 
 		// 如果返回的结果数量小于 limit，说明已经是最后一页

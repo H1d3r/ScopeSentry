@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/Autumn-27/ScopeSentry/internal/utils/helper"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -22,14 +23,11 @@ import (
 
 	"github.com/Autumn-27/ScopeSentry/internal/constants"
 	"github.com/Autumn-27/ScopeSentry/internal/database/mongodb"
-	"github.com/Autumn-27/ScopeSentry/internal/database/redis"
 	"github.com/Autumn-27/ScopeSentry/internal/logger"
 	"github.com/Autumn-27/ScopeSentry/internal/models"
 	"github.com/Autumn-27/ScopeSentry/internal/options"
 	"github.com/Autumn-27/ScopeSentry/internal/repositories/plugin"
 	"github.com/Autumn-27/ScopeSentry/internal/services/node"
-	"github.com/Autumn-27/ScopeSentry/internal/services/poc"
-	taskCommon "github.com/Autumn-27/ScopeSentry/internal/services/task/common"
 	"github.com/gin-gonic/gin"
 	"github.com/valyala/fasthttp"
 	"go.mongodb.org/mongo-driver/bson"
@@ -807,24 +805,20 @@ func (s *service) Run(ctx *gin.Context, req *models.PluginRunRequest) error {
 		plgRunner = plugin.Clone()
 	}
 
-	// 构建 PluginOption
-	pluginOption := options.PluginOption{
-		DB:                mongodb.DB,
-		RedisClinet:       redis.Client,
-		TaskCommonService: taskCommon.NewService(),
-		Node:              node.NewService(),
-		PocService:        poc.NewService(),
-	}
-
-	// 执行插件
 	plgRunner.Log("plugin is running manually")
-	err := plgRunner.Execute(pluginOption)
+	_, err := mongodb.UpdateOne("plugins", bson.M{"hash": req.Hash}, bson.M{"$set": bson.M{"lastTime": helper.GetNowTimeString()}})
 	if err != nil {
-		logger.Error(fmt.Sprintf("plugin execution error: %v", err))
-		plgRunner.Log(fmt.Sprintf("plugin execution error: %v", err), "e")
-		return fmt.Errorf("plugin execution failed: %w", err)
+		logger.Error("failed to update plugin", zap.Error(err))
 	}
-	plgRunner.Log("plugin execution completed")
+	// 执行插件
+	go func() {
+		err = plgRunner.Execute(options.PluginOptionInit)
+		if err != nil {
+			logger.Error(fmt.Sprintf("plugin execution error: %v", err))
+			plgRunner.Log(fmt.Sprintf("plugin execution error: %v", err), "e")
+		}
+		plgRunner.Log("plugin execution completed")
+	}()
 
 	return nil
 }

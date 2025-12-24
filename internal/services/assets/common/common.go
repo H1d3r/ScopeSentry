@@ -36,7 +36,7 @@ type Service interface {
 	AddTag(ctx *gin.Context, req *models.TagRequest) error
 	DeleteTag(ctx *gin.Context, req *models.TagRequest) error
 	UpdateStatus(ctx *gin.Context, req *models.StatusRequest) error
-	TotalData(ctx *gin.Context, req *models.SearchRequest) (int64, error)
+	TotalData(ctx context.Context, req *models.SearchRequest) (int64, error)
 }
 
 type service struct {
@@ -250,7 +250,7 @@ func (s *service) UpdateStatus(ctx *gin.Context, req *models.StatusRequest) erro
 }
 
 // TotalData 获取总数
-func (s *service) TotalData(ctx *gin.Context, req *models.SearchRequest) (int64, error) {
+func (s *service) TotalData(ctx context.Context, req *models.SearchRequest) (int64, error) {
 	if !isValidCollection(req.Index) {
 		return 0, ErrInvalidCollection
 	}
@@ -266,10 +266,10 @@ func (s *service) TotalData(ctx *gin.Context, req *models.SearchRequest) (int64,
 	}
 	if len(searchQuery) == 0 {
 		// 使用estimatedDocumentCount获取估计的文档数量
-		return s.repo.EstimatedDocumentCount(ctx.Request.Context(), req.Index)
+		return s.repo.EstimatedDocumentCount(ctx, req.Index)
 	}
 	filter := bson.M(searchQuery)
-	return s.repo.CountDocuments(ctx.Request.Context(), req.Index, filter)
+	return s.repo.CountDocuments(ctx, req.Index, filter)
 }
 
 // 辅助函数

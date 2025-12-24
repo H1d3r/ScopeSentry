@@ -8,133 +8,153 @@
 package utils
 
 import (
-	"bytes"
-	"io"
-	"net/http"
+	"crypto/tls"
+	"github.com/valyala/fasthttp"
 	"time"
 )
 
+type request struct {
+}
+
+var Requests *request
+
+var HttpClient *fasthttp.Client
+
 type HttpResponse struct {
+	StatusCode int
+	Headers    map[string]string
+	Body       []byte
+}
+
+func init() {
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true,
+	}
+
+	HttpClient = &fasthttp.Client{
+		ReadTimeout:                   time.Second * 10,
+		WriteTimeout:                  time.Second * 10,
+		MaxIdleConnDuration:           time.Second * 10,
+		NoDefaultUserAgentHeader:      true,
+		DisableHeaderNamesNormalizing: true,
+		DisablePathNormalizing:        true,
+		TLSConfig:                     tlsConfig,
+		ReadBufferSize:                4 * 1024 * 1024,
+		MaxResponseBodySize:           10 * 1024 * 1024,
+		Dial: (&fasthttp.TCPDialer{
+			Concurrency:      4096,
+			DNSCacheDuration: time.Hour,
+		}).Dial,
+	}
+	Requests = &request{}
+}
+
+type GetHttpResponse struct {
 	Url           string
 	StatusCode    int
-	Headers       map[string]string
-	Body          []byte
-	Redirect      string
+	Body          string
 	ContentLength int
+	Redirect      string
+	Title         string
 }
 
-/*
-request 结构（可扩展：超时、代理、重试等）
-*/
-type request struct {
-	client *http.Client
-}
-
-/*
-创建一个 request 实例
-*/
-func NewRequest(timeout time.Duration) *request {
-	return &request{
-		client: &http.Client{
-			Timeout: timeout,
-		},
+func (r *request) HttpGet(uri string) (GetHttpResponse, error) {
+	req, resp := fasthttp.AcquireRequest(), fasthttp.AcquireResponse()
+	// 最后需要归还req、resp到池中
+	defer func() {
+		fasthttp.ReleaseRequest(req)
+		fasthttp.ReleaseResponse(resp)
+	}()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI(uri)
+	if err := HttpClient.Do(req, resp); err != nil {
+		return GetHttpResponse{}, err
 	}
-}
+	tmp := GetHttpResponse{}
+	tmp.Url = uri
 
-/*
-HttpGet 方法
-*/
-func (r *request) HttpGet(uri string) (HttpResponse, error) {
-	req, err := http.NewRequest(http.MethodGet, uri, nil)
-	if err != nil {
-		return HttpResponse{}, err
-	}
-
-	resp, err := r.client.Do(req)
-	if err != nil {
-		return HttpResponse{}, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return HttpResponse{}, err
-	}
-
-	headers := make(map[string]string)
-	for k, v := range resp.Header {
-		if len(v) > 0 {
-			headers[k] = v[0]
+	tmp.Body = string(resp.Body())
+	tmp.StatusCode = resp.StatusCode()
+	if location := resp.Header.Peek("location"); len(location) > 0 {
+		tmp.Redirect = string(location)
+	} else {
+		rd := resp.Header.Peek("Location")
+		if len(rd) > 0 {
+			tmp.Redirect = string(rd)
+		} else {
+			tmp.Redirect = ""
 		}
 	}
-
-	res := HttpResponse{
-		Url:           uri,
-		StatusCode:    resp.StatusCode,
-		Headers:       headers,
-		Body:          body,
-		ContentLength: int(resp.ContentLength),
+	tmp.ContentLength = resp.Header.ContentLength()
+	if tmp.ContentLength < 0 {
+		tmp.ContentLength = len(resp.Body())
 	}
-
-	if res.ContentLength < 0 {
-		res.ContentLength = len(body)
-	}
-
-	if loc := resp.Header.Get("Location"); loc != "" {
-		res.Redirect = loc
-	}
-
-	return res, nil
+	return tmp, nil
 }
 
-func (r *request) HttpPost(uri string, requestBody []byte, ct string) (HttpResponse, error) {
-	req, err := http.NewRequest(http.MethodPost, uri, bytes.NewReader(requestBody))
-	if err != nil {
-		return HttpResponse{}, err
-	}
-
-	switch ct {
-	case "json":
+func (r *request) HttpPost(uri string, requestBody []byte, ct string) (error, HttpResponse) {
+	req, resp := fasthttp.AcquireRequest(), fasthttp.AcquireResponse()
+	defer func() {
+		fasthttp.ReleaseRequest(req)
+		fasthttp.ReleaseResponse(resp)
+	}()
+	req.Header.SetMethod(fasthttp.MethodPost)
+	req.SetRequestURI(uri)
+	if ct == "json" {
 		req.Header.Set("Content-Type", "application/json")
-	case "form":
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	case "text":
-		req.Header.Set("Content-Type", "text/plain")
+		requestBody = fixJSONNewlines(requestBody)
 	}
+	req.SetBody(requestBody)
 
-	resp, err := r.client.Do(req)
-	if err != nil {
-		return HttpResponse{}, err
+	if err := HttpClient.Do(req, resp); err != nil {
+		return err, HttpResponse{}
 	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return HttpResponse{}, err
-	}
-
 	headers := make(map[string]string)
-	for k, v := range resp.Header {
-		if len(v) > 0 {
-			headers[k] = v[0]
-		}
-	}
-
+	resp.Header.VisitAll(func(key, value []byte) {
+		headers[string(key)] = string(value)
+	})
 	res := HttpResponse{
-		Url:           uri,
-		StatusCode:    resp.StatusCode,
-		Headers:       headers,
-		Body:          body,
-		ContentLength: int(resp.ContentLength),
+		StatusCode: resp.StatusCode(),
+		Headers:    headers,
+		Body:       append([]byte(nil), resp.Body()...),
+	}
+	return nil, res
+}
+
+func fixJSONNewlines(b []byte) []byte {
+	var out []byte
+	inString := false
+	escaped := false
+
+	for i := 0; i < len(b); i++ {
+		c := b[i]
+
+		if escaped {
+			out = append(out, c)
+			escaped = false
+			continue
+		}
+
+		if c == '\\' {
+			escaped = true
+			out = append(out, c)
+			continue
+		}
+
+		if c == '"' {
+			inString = !inString
+			out = append(out, c)
+			continue
+		}
+
+		if inString && (c == '\n' || c == '\r') {
+			// 转义换行
+			out = append(out, '\\', 'n')
+			continue
+		}
+
+		out = append(out, c)
 	}
 
-	if res.ContentLength < 0 {
-		res.ContentLength = len(body)
-	}
-
-	if loc := resp.Header.Get("Location"); loc != "" {
-		res.Redirect = loc
-	}
-
-	return res, nil
+	return out
 }

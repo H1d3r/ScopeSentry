@@ -1,6 +1,7 @@
 package template
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Autumn-27/ScopeSentry/internal/models"
@@ -16,7 +17,7 @@ import (
 type Service interface {
 	List(ctx *gin.Context, pageIndex, pageSize int, query string) (*models.TemplateList, error)
 	Detail(ctx *gin.Context, id string) (*models.ScanTemplate, error)
-	Save(ctx *gin.Context, id string, result *models.ScanTemplate) (string, error)
+	Save(ctx context.Context, id string, result *models.ScanTemplate) (string, error)
 	Delete(ctx *gin.Context, ids []string) error
 }
 
@@ -86,7 +87,7 @@ func (s *service) Detail(ctx *gin.Context, id string) (*models.ScanTemplate, err
 }
 
 // Save 保存模板
-func (s *service) Save(ctx *gin.Context, id string, result *models.ScanTemplate) (string, error) {
+func (s *service) Save(ctx context.Context, id string, result *models.ScanTemplate) (string, error) {
 	if id == "" {
 		// 插入新模板
 		insertId, err := s.repo.InsertOne(ctx, result)
