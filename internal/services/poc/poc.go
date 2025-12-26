@@ -279,6 +279,7 @@ func (s *service) ImportPoc(ctx context.Context, filePath string) (*models.PocIm
 			repeatNum++
 			continue
 		}
+		templateIds = append(templateIds, pt.ID)
 		// 获取严重程度
 		severity := "unknown"
 		if pt.Info.Severity != "" {

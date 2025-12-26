@@ -9,6 +9,7 @@ package task
 import (
 	"context"
 	"fmt"
+	"github.com/Autumn-27/ScopeSentry/internal/services/plugin"
 	"math"
 	"strings"
 
@@ -49,6 +50,7 @@ type service struct {
 	commonService    commonTask.Service
 	schedulerService schedulerSvc.Service
 	nodeService      node.Service
+	pluginService    plugin.Service
 }
 
 // NewService 创建任务服务实例
@@ -58,6 +60,7 @@ func NewService() Service {
 		commonService:    commonTask.NewService(),
 		schedulerService: schedulerSvc.NewService(),
 		nodeService:      node.NewService(),
+		pluginService:    plugin.NewService(),
 	}
 }
 
@@ -554,6 +557,15 @@ func (s *service) ProcessTaskProgress(ctx context.Context, task models.Task) err
 			if err := s.taskRepo.Del(ctx, tmpKey, timeKey); err != nil {
 				logger.Error(fmt.Sprintf("failed to delete redis keys for completed task %s: %v", taskID, err))
 			}
+
+			// 调用服务端插件
+			go func() {
+				err := s.pluginService.RunTaskEnd(task)
+				if err != nil {
+					return
+				}
+			}()
+
 		} else {
 			// 更新任务进度
 			update := bson.M{

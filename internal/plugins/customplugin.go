@@ -13,6 +13,7 @@ import (
 	"github.com/Autumn-27/ScopeSentry/internal/database/redis"
 	"github.com/Autumn-27/ScopeSentry/internal/interfaces"
 	"github.com/Autumn-27/ScopeSentry/internal/logger"
+	"github.com/Autumn-27/ScopeSentry/internal/models"
 	"github.com/Autumn-27/ScopeSentry/internal/options"
 	"github.com/Autumn-27/ScopeSentry/internal/utils/helper"
 )
@@ -22,15 +23,17 @@ type Plugin struct {
 	CycleFunc       func() string
 	InstallFunc     func() error
 	ExecuteFunc     func(op options.PluginOption) error
+	TaskEndFunc     func(task models.Task) error
 	GetNameFunc     func() string
 	GetPluginIdFunc func() string
 }
 
-func NewPlugin(plgId string, installFunc func() error, executeFunc func(op options.PluginOption) error, getNameFunc func() string, cycleFunc func() string) *Plugin {
+func NewPlugin(plgId string, installFunc func() error, executeFunc func(op options.PluginOption) error, taskEndFunc func(task models.Task) error, getNameFunc func() string, cycleFunc func() string) *Plugin {
 	return &Plugin{
 		Id:          plgId,
 		InstallFunc: installFunc,
 		ExecuteFunc: executeFunc,
+		TaskEndFunc: taskEndFunc,
 		GetNameFunc: getNameFunc,
 		CycleFunc:   cycleFunc,
 	}
@@ -50,6 +53,10 @@ func (p *Plugin) Execute(op options.PluginOption) error {
 	op.Log = p.Log
 	op.Notification = config.Notification
 	return p.ExecuteFunc(op)
+}
+
+func (p *Plugin) TaskEnd(task models.Task) error {
+	return p.TaskEndFunc(task)
 }
 
 func (p *Plugin) GetName() string {
@@ -94,6 +101,7 @@ func (p *Plugin) Clone() interfaces.Plugin {
 		Id:              p.Id,
 		InstallFunc:     p.InstallFunc,
 		ExecuteFunc:     p.ExecuteFunc,
+		TaskEndFunc:     p.TaskEndFunc,
 		GetNameFunc:     p.GetNameFunc,
 		GetPluginIdFunc: p.GetPluginIdFunc,
 		CycleFunc:       p.CycleFunc,

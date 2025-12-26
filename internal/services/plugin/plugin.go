@@ -3,6 +3,7 @@ package plugin
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
@@ -55,6 +56,7 @@ type Service interface {
 	ImportByData(ctx *gin.Context, req *models.PluginImportByDataRequest) error
 	UpdateStatus(ctx *gin.Context, req *models.PluginStatusRequest) error
 	Run(ctx *gin.Context, req *models.PluginRunRequest) error
+	RunTaskEnd(task models.Task) error
 }
 
 // service 实现插件服务接口
@@ -820,5 +822,31 @@ func (s *service) Run(ctx *gin.Context, req *models.PluginRunRequest) error {
 		plgRunner.Log("plugin execution completed")
 	}()
 
+	return nil
+}
+
+func (s *service) RunTaskEnd(task models.Task) error {
+	query := bson.M{"type": "server", "status": true}
+	logger.Info(fmt.Sprintf("executing task end plugin: %v", task.Name))
+	opts := mongoOptions.Find()
+
+	plgs, err := s.repo.FindWithPagination(context.Background(), query, opts)
+	if err != nil {
+		return fmt.Errorf("failed to find plugins: %w", err)
+	}
+	for _, plgTmp := range plgs {
+		plg, flag := plugins.GlobalPluginManager.GetPlugin(plgTmp.Hash)
+		if flag {
+			go func() {
+				err := plg.TaskEnd(task)
+				if err != nil {
+					logger.Error(fmt.Sprintf("plugin taskend execution error: %v", err))
+					return
+				}
+			}()
+		} else {
+			logger.Error(fmt.Sprintf("plugin not found: %v", plgTmp.Hash))
+		}
+	}
 	return nil
 }

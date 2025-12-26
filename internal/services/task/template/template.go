@@ -45,7 +45,7 @@ func (s *service) List(ctx *gin.Context, pageIndex, pageSize int, query string) 
 			"name": 1,
 		}).
 		SetSkip(int64((pageIndex - 1) * pageSize)).
-		SetLimit(int64(pageSize))
+		SetLimit(int64(pageSize)).SetSort(bson.M{"_id": -1})
 
 	// 获取总数
 	total, err := s.repo.Count(ctx, filter)

@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/Autumn-27/ScopeSentry/internal/services/task/task"
 	"strings"
 	"sync"
 	"time"
@@ -34,10 +35,12 @@ var (
 	LOG_INFO     map[string][]string
 	logInfoMutex sync.RWMutex
 )
+var taskService task.Service
 
 func init() {
 	LOG_INFO = make(map[string][]string)
 	GET_LOG_NAME = make([]string, 0)
+	taskService = task.NewService()
 }
 
 // SubscribeLogChannel 订阅 Redis 日志通道并处理消息
@@ -48,7 +51,7 @@ func SubscribeLogChannel() {
 	for {
 		trySubscribe(channelName)
 		// 如果连接失败，等待1秒后重试
-		time.Sleep(1 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
 }
 
@@ -118,6 +121,14 @@ func handleMessage(ctx context.Context, payload string) error {
 		if err := checkNodeTask(ctx, logName); err != nil {
 			logger.Error("Failed to check node task", zap.String("node", logName), zap.Error(err))
 		}
+	}
+	if strings.Contains(logContent, "Task end") {
+		go func() {
+			err := taskService.TaskProgress(context.Background())
+			if err != nil {
+				return
+			}
+		}()
 	}
 
 	// 将日志推送到 Redis list

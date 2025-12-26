@@ -7,13 +7,17 @@
 
 package interfaces
 
-import "github.com/Autumn-27/ScopeSentry/internal/options"
+import (
+	"github.com/Autumn-27/ScopeSentry/internal/models"
+	"github.com/Autumn-27/ScopeSentry/internal/options"
+)
 
 type Plugin interface {
 	GetName() string
 	Cycle() string
 	Install() error
 	Execute(op options.PluginOption) error
+	TaskEnd(task models.Task) error
 	Clone() Plugin
 	Log(msg string, tp ...string)
 	GetPluginId() string

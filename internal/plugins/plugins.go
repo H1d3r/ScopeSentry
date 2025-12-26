@@ -11,6 +11,7 @@ import (
 	"github.com/Autumn-27/ScopeSentry/internal/database/mongodb"
 	"github.com/Autumn-27/ScopeSentry/internal/interfaces"
 	"github.com/Autumn-27/ScopeSentry/internal/logger"
+	"github.com/Autumn-27/ScopeSentry/internal/models"
 	"github.com/Autumn-27/ScopeSentry/internal/options"
 	"github.com/Autumn-27/ScopeSentry/internal/symbols"
 	"github.com/traefik/yaegi/interp"
@@ -62,6 +63,14 @@ func LoadPlugin(code string, plgHash string) (interfaces.Plugin, error) {
 	}
 	executeFunc := v.Interface().(func(op options.PluginOption) error)
 
+	// 获取TaskEnd
+	v, err = interp.Eval("plugin.TaskEnd")
+	taskEndFunc := func(task models.Task) error { return nil }
+	if err != nil {
+	} else {
+		taskEndFunc = v.Interface().(func(task models.Task) error)
+	}
+
 	// 获取Cycle
 	v, err = interp.Eval("plugin.Cycle")
 	if err != nil {
@@ -83,7 +92,7 @@ func LoadPlugin(code string, plgHash string) (interfaces.Plugin, error) {
 	}
 	getNameFunc := v.Interface().(func() string)
 
-	plg := NewPlugin(plgHash, installFunc, executeFunc, getNameFunc, cycleFunc)
+	plg := NewPlugin(plgHash, installFunc, executeFunc, taskEndFunc, getNameFunc, cycleFunc)
 
 	return plg, err
 }
