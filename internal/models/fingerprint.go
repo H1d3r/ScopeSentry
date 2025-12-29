@@ -14,7 +14,7 @@ type FingerprintRule struct {
 	ID             primitive.ObjectID `json:"id" bson:"_id,omitempty"`
 	Name           string             `json:"name" bson:"name"`
 	Rule           string             `json:"rule" bson:"rule"`
-	Express        []string           `json:"express" bson:"express"`
+	FingerprintId  string             `json:"fingerprint_id" bson:"fingerprint_id"`
 	Category       string             `json:"category" bson:"category"`
 	ParentCategory string             `json:"parent_category" bson:"parent_category"`
 	Amount         int                `json:"amount" bson:"amount"`

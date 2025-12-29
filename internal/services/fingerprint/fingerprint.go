@@ -7,7 +7,6 @@ import (
 	"github.com/Autumn-27/ScopeSentry/internal/models"
 	repo "github.com/Autumn-27/ScopeSentry/internal/repositories/fingerprint"
 	"github.com/Autumn-27/ScopeSentry/internal/services/node"
-	"github.com/Autumn-27/ScopeSentry/internal/utils/helper"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -36,7 +35,8 @@ func (s *service) List(ctx context.Context, search string, pageIndex, pageSize i
 	// 设置查询选项：投影、分页、排序
 	opts := options.Find().
 		SetSkip(int64((pageIndex - 1) * pageSize)).
-		SetLimit(int64(pageSize))
+		SetLimit(int64(pageSize)).
+		SetSort(bson.D{{"_id", -1}})
 
 	total, err := s.repo.Count(ctx, filter)
 	if err != nil {
@@ -53,11 +53,12 @@ func (s *service) Add(ctx context.Context, data models.FingerprintRule) (string,
 	if data.Rule == "" {
 		return "", errors.New("rule is null")
 	}
-	express, err := helper.StringToPostfix(data.Rule)
-	if err != nil || len(express) == 0 {
-		return "", errors.New("rule to express error")
-	}
-	data.Express = express
+	// Rule 现在存储的是 YAML 内容，不再转换为 Express
+	// express, err := helper.StringToPostfix(data.Rule)
+	// if err != nil || len(express) == 0 {
+	// 	return "", errors.New("rule to express error")
+	// }
+	// data.Express = express
 	data.Amount = 0
 	id, err := s.repo.Insert(ctx, &data)
 	if err != nil {
@@ -71,17 +72,19 @@ func (s *service) Update(ctx context.Context, id string, data models.Fingerprint
 	if data.Rule == "" {
 		return errors.New("rule is null")
 	}
-	express, err := helper.StringToPostfix(data.Rule)
-	if err != nil || len(express) == 0 {
-		return errors.New("rule to express error")
-	}
+	// Rule 现在存储的是 YAML 内容，不再转换为 Express
+	// express, err := helper.StringToPostfix(data.Rule)
+	// if err != nil || len(express) == 0 {
+	// 	return errors.New("rule to express error")
+	// }
 	update := bson.M{"$set": bson.M{
 		"name":            data.Name,
 		"rule":            data.Rule,
-		"express":         express,
+		"fingerprint_id":  data.FingerprintId,
 		"category":        data.Category,
 		"parent_category": data.ParentCategory,
 		"state":           data.State,
+		"company":         data.Company,
 	}}
 	if err := s.repo.Update(ctx, id, update); err != nil {
 		return err

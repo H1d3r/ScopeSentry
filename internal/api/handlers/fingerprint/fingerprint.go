@@ -11,7 +11,9 @@ import (
 	"github.com/Autumn-27/ScopeSentry/internal/api/response"
 	"github.com/Autumn-27/ScopeSentry/internal/models"
 	service "github.com/Autumn-27/ScopeSentry/internal/services/fingerprint"
+	"github.com/Autumn-27/ScopeSentry/internal/utils/random"
 	"github.com/gin-gonic/gin"
+	"gopkg.in/yaml.v3"
 )
 
 var fingerprintService service.Service
@@ -23,24 +25,51 @@ type listRequest struct {
 }
 
 type updateRequest struct {
-	ID             string `json:"id" binding:"required" example:"6642b0..."`
-	Name           string `json:"name" binding:"required" example:"Nginx"`
-	Rule           string `json:"rule" binding:"required" example:"body~=nginx && header~=server"`
-	Category       string `json:"category" binding:"required" example:"web"`
-	ParentCategory string `json:"parent_category" binding:"omitempty"`
-	State          bool   `json:"state"`
+	ID      string `json:"id" binding:"required" example:"6642b0..."`
+	Content string `json:"content" binding:"required" example:"name: Nginx\ncategory: web"`
+	State   bool   `json:"state"`
 }
 
 type addRequest struct {
-	Name           string `json:"name" binding:"required" example:"Nginx"`
-	Rule           string `json:"rule" binding:"required" example:"body~=nginx && header~=server"`
-	Category       string `json:"category" binding:"required" example:"web"`
-	ParentCategory string `json:"parent_category" binding:"omitempty"`
-	State          bool   `json:"state" binding:"required" example:"1"`
+	Content string `json:"content" binding:"required" example:"name: Nginx\ncategory: web"`
+	State   bool   `json:"state" example:"1"`
 }
 
 type deleteRequest struct {
 	IDs []string `json:"ids" binding:"required,min=1,dive,required"`
+}
+
+// Fingerprint YAML 指纹定义
+type Fingerprint struct {
+	Name           string `yaml:"name"`
+	Id             string `yaml:"id"`
+	Tags           string `yaml:"tags"`
+	Category       string `yaml:"category"`
+	ParentCategory string `yaml:"parent_category"`
+	Company        string `yaml:"company"`
+	Rules          []Rule `yaml:"rules"`
+}
+
+// Rule 规则定义
+type Rule struct {
+	Logic      string      `yaml:"logic"` // AND 或 OR
+	Conditions []Condition `yaml:"conditions"`
+}
+
+// Condition 条件定义（支持普通条件和嵌套条件组）
+type Condition struct {
+	// 普通条件字段
+	Location    string `yaml:"location,omitempty"`   // body, header, title, request
+	MatchType   string `yaml:"match_type,omitempty"` // regex, contains, extract, active
+	Pattern     string `yaml:"pattern,omitempty"`
+	Group       int    `yaml:"group,omitempty"`
+	SaveAs      string `yaml:"save_as,omitempty"`
+	Path        string `yaml:"path,omitempty"`
+	DynamicPath string `yaml:"dynamic_path,omitempty"`
+	Method      string `yaml:"method,omitempty"`
+	// 嵌套条件组字段
+	Logic      string      `yaml:"logic,omitempty"`      // AND 或 OR（用于嵌套组）
+	Conditions []Condition `yaml:"conditions,omitempty"` // 子条件或嵌套组
 }
 
 // Data @Summary      指纹规则查询
@@ -84,13 +113,24 @@ func Update(c *gin.Context) {
 		response.BadRequest(c, "api.bad_request", err)
 		return
 	}
-	data := models.FingerprintRule{
-		Name:           req.Name,
-		Rule:           req.Rule,
-		Category:       req.Category,
-		ParentCategory: req.ParentCategory,
-		State:          req.State,
+
+	// 解析 YAML content
+	var fp Fingerprint
+	if err := yaml.Unmarshal([]byte(req.Content), &fp); err != nil {
+		response.BadRequest(c, "api.bad_request", err)
+		return
 	}
+
+	// 从解析后的结构体中提取字段
+	data := models.FingerprintRule{
+		Name:           fp.Name,
+		Rule:           req.Content, // 存储完整的 YAML content
+		Category:       fp.Category,
+		ParentCategory: fp.ParentCategory,
+		State:          req.State,
+		Company:        fp.Company,
+	}
+
 	if err := fingerprintService.Update(c, req.ID, data); err != nil {
 		response.InternalServerError(c, "api.error", err)
 		return
@@ -114,13 +154,35 @@ func Add(c *gin.Context) {
 		response.BadRequest(c, "api.bad_request", err)
 		return
 	}
-	data := models.FingerprintRule{
-		Name:           req.Name,
-		Rule:           req.Rule,
-		Category:       req.Category,
-		ParentCategory: req.ParentCategory,
-		State:          req.State,
+
+	// 解析 YAML content
+	var fp Fingerprint
+	if err := yaml.Unmarshal([]byte(req.Content), &fp); err != nil {
+		response.BadRequest(c, "api.bad_request", err)
+		return
 	}
+
+	// 生成 ID 并添加到 Fingerprint 结构体 (sas_ + 8位随机大小写字母和数字)
+	fp.Id = "sas_" + random.GenerateRandomString(8)
+
+	// 将更新后的 Fingerprint 结构体重新序列化为 YAML
+	updatedContent, err := yaml.Marshal(&fp)
+	if err != nil {
+		response.InternalServerError(c, "api.error", err)
+		return
+	}
+
+	// 从解析后的结构体中提取字段
+	data := models.FingerprintRule{
+		Name:           fp.Name,
+		Rule:           string(updatedContent), // 存储包含 id 的完整 YAML content
+		FingerprintId:  fp.Id,                  // 存储 YAML 中的 id 字段
+		Category:       fp.Category,
+		ParentCategory: fp.ParentCategory,
+		State:          req.State,
+		Company:        fp.Company,
+	}
+
 	id, err := fingerprintService.Add(c, data)
 	if err != nil {
 		response.InternalServerError(c, "api.error", err)
