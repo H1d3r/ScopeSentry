@@ -43,6 +43,18 @@ func RegisterFingerprintRoutes(api *gin.RouterGroup) {
 				Handler:     handler.Delete,
 				Middlewares: common.WithAuth(),
 			},
+			{
+				Method:      "GET",
+				Path:        "/version",
+				Handler:     handler.GetVersion,
+				Middlewares: common.WithAuth(),
+			},
+			{
+				Method:      "POST",
+				Path:        "/batch-add",
+				Handler:     handler.BatchAdd,
+				Middlewares: common.WithAuth(),
+			},
 		},
 	}
 

@@ -115,6 +115,13 @@ func CreateDatabase() error {
 			"type":  "rad",
 		})
 
+		// 插入指纹版本
+		configCollection.InsertOne(context.Background(), bson.M{
+			"name":  "FingerVersion",
+			"value": "2026-01-20 23:50",
+			"type":  "finger",
+		})
+
 		currentStep++
 		printProgressBar(currentStep, totalSteps, "Setting timezone")
 
@@ -241,6 +248,7 @@ func CreateDatabase() error {
 				return fmt.Errorf("failed to insert fingerprint rules: %v", err)
 			}
 		}
+
 		currentStep++
 		printProgressBar(currentStep, totalSteps, "Creating fingerprint rules")
 

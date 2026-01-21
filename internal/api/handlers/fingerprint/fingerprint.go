@@ -39,6 +39,17 @@ type deleteRequest struct {
 	IDs []string `json:"ids" binding:"required,min=1,dive,required"`
 }
 
+type batchAddItem struct {
+	ID         string `json:"id" example:"SAS_xxxx"`
+	Name       string `json:"name" example:"druid-server"`
+	Content    string `json:"content" binding:"required" example:"fingerprint:\n  name: \"druid-server\"\n  category: \"Service\""`
+	UpdateTime string `json:"updateTime" example:"2026-01-19 23:50"`
+}
+
+type batchAddRequest struct {
+	Items []batchAddItem `json:"items" binding:"required,min=1,dive"`
+}
+
 // Fingerprint YAML 指纹定义
 type Fingerprint struct {
 	Name           string `yaml:"name"`
@@ -48,6 +59,10 @@ type Fingerprint struct {
 	ParentCategory string `yaml:"parent_category"`
 	Company        string `yaml:"company"`
 	Rules          []Rule `yaml:"rules"`
+}
+
+type FingerprintYaml struct {
+	Fingerprint Fingerprint `yaml:"fingerprint"`
 }
 
 // Rule 规则定义
@@ -115,7 +130,7 @@ func Update(c *gin.Context) {
 	}
 
 	// 解析 YAML content
-	var fp Fingerprint
+	var fp FingerprintYaml
 	if err := yaml.Unmarshal([]byte(req.Content), &fp); err != nil {
 		response.BadRequest(c, "api.bad_request", err)
 		return
@@ -123,12 +138,12 @@ func Update(c *gin.Context) {
 
 	// 从解析后的结构体中提取字段
 	data := models.FingerprintRule{
-		Name:           fp.Name,
+		Name:           fp.Fingerprint.Name,
 		Rule:           req.Content, // 存储完整的 YAML content
-		Category:       fp.Category,
-		ParentCategory: fp.ParentCategory,
+		Category:       fp.Fingerprint.Category,
+		ParentCategory: fp.Fingerprint.ParentCategory,
 		State:          req.State,
-		Company:        fp.Company,
+		Company:        fp.Fingerprint.Company,
 	}
 
 	if err := fingerprintService.Update(c, req.ID, data); err != nil {
@@ -156,31 +171,24 @@ func Add(c *gin.Context) {
 	}
 
 	// 解析 YAML content
-	var fp Fingerprint
+	var fp FingerprintYaml
 	if err := yaml.Unmarshal([]byte(req.Content), &fp); err != nil {
 		response.BadRequest(c, "api.bad_request", err)
 		return
 	}
 
 	// 生成 ID 并添加到 Fingerprint 结构体 (sas_ + 8位随机大小写字母和数字)
-	fp.Id = "sas_" + random.GenerateRandomString(8)
-
-	// 将更新后的 Fingerprint 结构体重新序列化为 YAML
-	updatedContent, err := yaml.Marshal(&fp)
-	if err != nil {
-		response.InternalServerError(c, "api.error", err)
-		return
-	}
+	FingerId := "SAA_" + random.GenerateRandomString(12)
 
 	// 从解析后的结构体中提取字段
 	data := models.FingerprintRule{
-		Name:           fp.Name,
-		Rule:           string(updatedContent), // 存储包含 id 的完整 YAML content
-		FingerprintId:  fp.Id,                  // 存储 YAML 中的 id 字段
-		Category:       fp.Category,
-		ParentCategory: fp.ParentCategory,
+		Name:           fp.Fingerprint.Name,
+		Rule:           req.Content, // 存储包含 id 的完整 YAML content
+		FingerprintId:  FingerId,    // 存储 YAML 中的 id 字段
+		Category:       fp.Fingerprint.Category,
+		ParentCategory: fp.Fingerprint.ParentCategory,
 		State:          req.State,
-		Company:        fp.Company,
+		Company:        fp.Fingerprint.Company,
 	}
 
 	id, err := fingerprintService.Add(c, data)
@@ -213,6 +221,63 @@ func Delete(c *gin.Context) {
 		return
 	}
 	response.Success(c, nil, "api.success")
+}
+
+// GetVersion @Summary      查询指纹版本
+// @Tags         fingerprint
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Success      200      {object}  response.SuccessResponse{data=object{version=string}}
+// @Failure      500      {object}  response.InternalServerErrorResponse
+// @Router       /fingerprint/version [get]
+func GetVersion(c *gin.Context) {
+	version, err := fingerprintService.GetVersion(c)
+	if err != nil {
+		response.InternalServerError(c, "api.error", err)
+		return
+	}
+	response.Success(c, gin.H{"version": version}, "api.success")
+}
+
+// BatchAdd @Summary      批量新增指纹规则
+// @Tags         fingerprint
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        request  body      batchAddRequest  true  "批量新增数据"
+// @Success      200      {object}  response.SuccessResponse{data=object{success=int,failed=int,results=[]object{id=int,success=bool,error=string}}}
+// @Failure      400      {object}  response.BadRequestResponse
+// @Failure      500      {object}  response.InternalServerErrorResponse
+// @Router       /fingerprint/batch-add [post]
+func BatchAdd(c *gin.Context) {
+	var req batchAddRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "api.bad_request", err)
+		return
+	}
+
+	// 转换类型
+	items := make([]service.BatchAddItem, len(req.Items))
+	for i, item := range req.Items {
+		items[i] = service.BatchAddItem{
+			ID:         item.ID,
+			Name:       item.Name,
+			Content:    item.Content,
+			UpdateTime: item.UpdateTime,
+		}
+	}
+
+	results, successCount, failedCount, err := fingerprintService.BatchAdd(c, items)
+	if err != nil {
+		response.InternalServerError(c, "api.error", err)
+		return
+	}
+
+	response.Success(c, gin.H{
+		"success": successCount,
+		"failed":  failedCount,
+		"results": results,
+	}, "api.success")
 }
 
 func init() {

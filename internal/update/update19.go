@@ -54,4 +54,10 @@ func Update19() {
 	}
 
 	// 插入指纹版本
+	configCollection := mongodb.DB.Collection("config")
+	configCollection.InsertOne(context.Background(), bson.M{
+		"name":  "FingerVersion",
+		"value": "2026-01-20 23:50",
+		"type":  "finger",
+	})
 }
