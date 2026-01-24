@@ -33,6 +33,25 @@ Front-end：vue - vue-element-plus-admin
 - Plugin Market: [Plugin Market](https://plugin.scope-sentry.top/en)
 - Plugin Template：[https://github.com/Autumn-27/ScopeSentry-Plugin-Template](https://github.com/Autumn-27/ScopeSentry-Plugin-Template)
 
+## Install
+```
+git clone https://github.com/Autumn-27/ScopeSentry.git
+cd ScopeSentry
+# Change the MongoDB and Redis account passwords in the. env file.
+docker-compose -f single-host-deployment.yml up -d
+```
+After running, there will be four containers: mongodb, redis, scope-sentry (server), and scopesentry-scan (scan). By default, there will be one scanning node.
+
+
+**Add new nodes(Optional)**
+
+```
+git clone https://github.com/Autumn-27/ScopeSentry-Scan.git
+cd ScopeSentry-Scan/build
+# Edit the connection information for MongoDB and Redis in the .env file. NodeName is the node name, and each node name should be unique (if it is empty, it will be randomly generated, and you can change the name in the web interface).
+docker-compose -f scan-docker-compose.yml up -d
+```
+
 ## Plugin Flowchart
 
 <img src="流程图.svg"/>

@@ -1,5 +1,5 @@
 // plugins-------------------------------------
-// @file      : customplugin.go
+// @file      : custom_plugin.go
 // @author    : Autumn
 // @contact   : rainy-autumn@outlook.com
 // @time      : 2025/12/3 20:44

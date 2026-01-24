@@ -28,6 +28,24 @@ Scope Sentry是一款具有分布式资产测绘、子域名枚举、信息泄�
 - 插件模板：[https://github.com/Autumn-27/ScopeSentry-Plugin-Template](https://github.com/Autumn-27/ScopeSentry-Plugin-Template)
 
 
+## 安装
+```
+git clone https://github.com/Autumn-27/ScopeSentry.git
+cd ScopeSentry
+# 修改.env文件中的mongodb、redis账号密码。
+docker-compose -f single-host-deployment.yml up -d
+```
+运行之后一共四个容器scope-sentry (服务端-web界面)、scopesentry-scan (扫描端)、Mongodb (数据库)、Redis。（默认会有一个扫描节点）
+
+
+**添加新的节点(可选)**
+```
+git clone https://github.com/Autumn-27/ScopeSentry-Scan.git
+cd ScopeSentry-Scan/build
+# 编辑 .env文件中Mongdb、Redis的连接信息，NodeName为节点名称，每个节点名称请保持唯一性（如果为空会随机生成，可在web界面更改名称）。
+docker-compose -f scan-docker-compose.yml up -d
+```
+
 
 ## 插件流程图
 

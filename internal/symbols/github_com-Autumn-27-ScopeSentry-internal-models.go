@@ -61,6 +61,7 @@ func init() {
 		"NodeData":                     reflect.ValueOf((*models.NodeData)(nil)),
 		"NodePluginInfo":               reflect.ValueOf((*models.NodePluginInfo)(nil)),
 		"Notification":                 reflect.ValueOf((*models.Notification)(nil)),
+		"NotificationApi":              reflect.ValueOf((*models.NotificationApi)(nil)),
 		"PageMonitoring":               reflect.ValueOf((*models.PageMonitoring)(nil)),
 		"PageMonitoringAddRequest":     reflect.ValueOf((*models.PageMonitoringAddRequest)(nil)),
 		"PageMonitoringBody":           reflect.ValueOf((*models.PageMonitoringBody)(nil)),
