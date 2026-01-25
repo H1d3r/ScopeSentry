@@ -15,7 +15,7 @@ import (
 
 // Service 定义模板服务接口
 type Service interface {
-	List(ctx *gin.Context, pageIndex, pageSize int, query string) (*models.TemplateList, error)
+	List(ctx context.Context, pageIndex, pageSize int, query string) (*models.TemplateList, error)
 	Detail(ctx *gin.Context, id string) (*models.ScanTemplate, error)
 	Save(ctx context.Context, id string, result *models.ScanTemplate) (string, error)
 	Delete(ctx *gin.Context, ids []string) error
@@ -33,7 +33,7 @@ func NewService() Service {
 }
 
 // List 获取模板列表
-func (s *service) List(ctx *gin.Context, pageIndex, pageSize int, query string) (*models.TemplateList, error) {
+func (s *service) List(ctx context.Context, pageIndex, pageSize int, query string) (*models.TemplateList, error) {
 	filter := bson.M{
 		"name": bson.M{"$regex": query},
 	}

@@ -9,6 +9,7 @@ package helper
 import (
 	"errors"
 	"fmt"
+	"github.com/Autumn-27/ScopeSentry/internal/logger"
 	"regexp"
 	"strings"
 	"sync"
@@ -420,6 +421,7 @@ func SearchToMongoDB(expressionRaw string, keyword map[string]string) ([]map[str
 
 // GetSearchQuery 构建完整的搜索查询
 func GetSearchQuery(req models.SearchRequest) (map[string]interface{}, error) {
+	logger.Logger.Info(fmt.Sprintf("search query: %v", req))
 	if req.Index == "" {
 		return nil, errors.New("search type is required")
 	}

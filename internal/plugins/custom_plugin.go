@@ -23,12 +23,12 @@ type Plugin struct {
 	CycleFunc       func() string
 	InstallFunc     func() error
 	ExecuteFunc     func(op options.PluginOption) error
-	TaskEndFunc     func(task models.Task) error
+	TaskEndFunc     func(task models.Task, plgHash string) error
 	GetNameFunc     func() string
 	GetPluginIdFunc func() string
 }
 
-func NewPlugin(plgId string, installFunc func() error, executeFunc func(op options.PluginOption) error, taskEndFunc func(task models.Task) error, getNameFunc func() string, cycleFunc func() string) *Plugin {
+func NewPlugin(plgId string, installFunc func() error, executeFunc func(op options.PluginOption) error, taskEndFunc func(task models.Task, plgHash string) error, getNameFunc func() string, cycleFunc func() string) *Plugin {
 	return &Plugin{
 		Id:          plgId,
 		InstallFunc: installFunc,
@@ -52,11 +52,12 @@ func (p *Plugin) Execute(op options.PluginOption) error {
 	op.SetStringVariable = SetStringVariable
 	op.Log = p.Log
 	op.Notification = config.Notification
+	op.PluginHash = p.Id
 	return p.ExecuteFunc(op)
 }
 
-func (p *Plugin) TaskEnd(task models.Task) error {
-	return p.TaskEndFunc(task)
+func (p *Plugin) TaskEnd(task models.Task, plgHash string) error {
+	return p.TaskEndFunc(task, plgHash)
 }
 
 func (p *Plugin) GetName() string {

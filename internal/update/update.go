@@ -71,6 +71,10 @@ func Update() error {
 			Update18()
 		}
 
+		if semver.Compare(currentVersion, "v1.9.0") < 0 {
+			Update19()
+		}
+
 		// 更新数据库记录
 		_, err := configColl.UpdateOne(context.Background(), bson.M{"name": "version"}, bson.M{
 			"$set": bson.M{

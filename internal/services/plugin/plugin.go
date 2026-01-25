@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/Autumn-27/ScopeSentry/internal/utils"
 	"github.com/Autumn-27/ScopeSentry/internal/utils/helper"
 	"io"
 	"io/ioutil"
@@ -170,11 +171,8 @@ func (s *service) Save(ctx *gin.Context, req *models.PluginSaveRequest) error {
 				}
 			}()
 		} else {
-			go func() {
-				RegisterPlugin(plugin.Source, plugin.Hash)
-			}()
+			RegisterPlugin(plugin.Source, plugin.Hash)
 		}
-		return nil
 	} else {
 		// 更新现有插件
 		id, err := primitive.ObjectIDFromHex(req.ID)
@@ -209,18 +207,20 @@ func (s *service) Save(ctx *gin.Context, req *models.PluginSaveRequest) error {
 				}
 			}()
 		} else {
-			go func() {
-				// server的时候id是插件的hash
-				loadPlugin, err := plugins.LoadPlugin(req.Source, req.Hash)
-				if err != nil {
-					logger.Error("failed to load plugin", zap.Error(err))
-					return
-				}
-				plugins.GlobalPluginManager.RegisterPlugin(req.Hash, loadPlugin)
-			}()
+			// server的时候id是插件的hash
+			loadPlugin, err := plugins.LoadPlugin(req.Source, req.Hash)
+			if err != nil {
+				logger.Error("failed to load plugin", zap.Error(err))
+				return err
+			}
+			plugins.GlobalPluginManager.RegisterPlugin(req.Hash, loadPlugin)
 		}
-		return nil
 	}
+	// 服务端插件 无论是插入还是更新，判断cycle是不是1 如果是1 表示运行1次
+	if req.Type == "server" {
+		plugins.RunPluginOnce(req.Hash)
+	}
+	return nil
 }
 
 // Delete 删除插件
@@ -238,6 +238,15 @@ func (s *service) Delete(ctx *gin.Context, req *models.PluginDeleteRequest) erro
 				err := s.nodeService.RefreshConfig(ctx, msg)
 				if err != nil {
 					logger.Error("failed to refresh config", zap.Error(err))
+				}
+			} else {
+				// module 为空 说明是服务端插件
+				// 删除插件
+				plugins.GlobalPluginManager.DeletePlugin(item.Hash)
+				// 移除计划任务
+				err := schedulerCore.GetGlobalScheduler().RemoveJob(item.Hash)
+				if err != nil {
+					logger.Error(fmt.Sprintf("failed to remove job: %v", err))
 				}
 			}
 		}()
@@ -406,6 +415,8 @@ func (s *service) Import(ctx *gin.Context, filePath string, reqKey string) error
 	}()
 	if pluginInfo.Type == "server" {
 		RegisterPlugin(pluginInfo.Source, pluginInfo.Hash)
+		// 判断是否需要运行一次
+		plugins.RunPluginOnce(pluginInfo.Hash)
 	}
 
 	return nil
@@ -713,6 +724,7 @@ func (s *service) ImportByData(ctx *gin.Context, req *models.PluginImportByDataR
 	}
 	if pluginInfo.Type == "server" {
 		RegisterPlugin(pluginInfo.Source, pluginInfo.Hash)
+		plugins.RunPluginOnce(pluginInfo.Hash)
 	}
 
 	return nil
@@ -745,25 +757,6 @@ func generatePluginHash(length int, tp string) string {
 // UpdateStatus 更新插件状态
 func (s *service) UpdateStatus(ctx *gin.Context, req *models.PluginStatusRequest) error {
 
-	if req.Status {
-		plg, flag := plugins.GlobalPluginManager.GetPlugin(req.ID)
-		if !flag {
-			logger.Error(fmt.Sprintf("failed to get plugin status: %v", req.ID))
-			return fmt.Errorf("failed to get plugin: %v", req.ID)
-		}
-		if plg.Cycle() != "" {
-			err := AddJob(plg.GetPluginId(), plg.Cycle())
-			if err != nil {
-				return err
-			}
-		}
-	} else {
-		err := schedulerCore.GetGlobalScheduler().RemoveJob(req.ID)
-		if err != nil {
-			logger.Error(fmt.Sprintf("failed to remove job: %v", err))
-			return err
-		}
-	}
 	update := bson.M{
 		"status": req.Status,
 	}
@@ -771,7 +764,33 @@ func (s *service) UpdateStatus(ctx *gin.Context, req *models.PluginStatusRequest
 	if err != nil {
 		return fmt.Errorf("failed to update plugin status: %w", err)
 	}
-
+	if req.Status {
+		plg, flag := plugins.GlobalPluginManager.GetPlugin(req.ID)
+		if !flag {
+			logger.Error(fmt.Sprintf("failed to get plugin status: %v", req.ID))
+			return fmt.Errorf("failed to get plugin: %v", req.ID)
+		}
+		if plg.Cycle() != "" {
+			if plg.Cycle() == "1" {
+				plugins.RunPluginOnce(plg.GetPluginId())
+			} else {
+				err := AddJob(plg.GetPluginId(), plg.Cycle())
+				if err != nil {
+					return err
+				}
+			}
+		}
+	} else {
+		flag := utils.HasContext(req.ID)
+		if flag {
+			utils.CancelContext(req.ID)
+		}
+		err := schedulerCore.GetGlobalScheduler().RemoveJob(req.ID)
+		if err != nil {
+			logger.Error(fmt.Sprintf("failed to remove job: %v", err))
+			return err
+		}
+	}
 	return nil
 }
 
@@ -814,7 +833,7 @@ func (s *service) Run(ctx *gin.Context, req *models.PluginRunRequest) error {
 	}
 	// 执行插件
 	go func() {
-		err = plgRunner.Execute(options.PluginOptionInit)
+		err = plgRunner.Execute(options.NewOption(req.Hash))
 		if err != nil {
 			logger.Error(fmt.Sprintf("plugin execution error: %v", err))
 			plgRunner.Log(fmt.Sprintf("plugin execution error: %v", err), "e")
@@ -838,7 +857,7 @@ func (s *service) RunTaskEnd(task models.Task) error {
 		plg, flag := plugins.GlobalPluginManager.GetPlugin(plgTmp.Hash)
 		if flag {
 			go func() {
-				err := plg.TaskEnd(task)
+				err := plg.TaskEnd(task, plgTmp.Hash)
 				if err != nil {
 					logger.Error(fmt.Sprintf("plugin taskend execution error: %v", err))
 					return

@@ -74,7 +74,7 @@ func main() {
 	if err != nil {
 		return
 	}
-	constants.Version = "1.8"
+	constants.Version = "1.9"
 	fmt.Printf("version: %v\n", constants.Version)
 	PrintPlugin()
 	err = update.Update()

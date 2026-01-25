@@ -38,7 +38,7 @@ func TemplateList(c *gin.Context) {
 		return
 	}
 
-	result, err := templateService.List(c, req.PageIndex, req.PageSize, req.Query)
+	result, err := templateService.List(c.Request.Context(), req.PageIndex, req.PageSize, req.Query)
 	if err != nil {
 		response.InternalServerError(c, "api.error", err)
 		return

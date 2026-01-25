@@ -25,9 +25,13 @@ func RegisterPlugin(source, hash string) {
 		logger.Error("failed to install plugin", zap.Error(err))
 		return
 	}
-
+	cycle := loadPlugin.Cycle()
 	// 计划任务不为空
-	if loadPlugin.Cycle() != "" {
+	if cycle != "" {
+		// 如果是1 表示运行1次
+		if cycle == "1" {
+			return
+		}
 		err := AddJob(hash, loadPlugin.Cycle())
 		if err != nil {
 			return

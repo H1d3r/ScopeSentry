@@ -108,7 +108,23 @@ func parseShodanLogicExpression(query string) string {
 		return ""
 	}
 
-	// 按 OR 分割（优先级最低，需要处理大小写）
+	// 按 || 分割（优先级最低，符号形式）
+	if hasOperator(query, "||") {
+		parts := splitByShodanOperatorSymbol(query, "||")
+		var results []string
+		for _, part := range parts {
+			parsed := parseShodanLogicExpression(strings.TrimSpace(part))
+			if parsed != "" {
+				results = append(results, parsed)
+			}
+		}
+		if len(results) > 0 {
+			return strings.Join(results, " || ")
+		}
+		return ""
+	}
+
+	// 按 OR 分割（优先级最低，需要处理大小写，文本形式）
 	if strings.Contains(strings.ToUpper(query), " OR ") {
 		parts := splitByShodanOperator(query, " OR ")
 		var results []string
@@ -124,7 +140,23 @@ func parseShodanLogicExpression(query string) string {
 		return ""
 	}
 
-	// 按 AND 分割（需要处理大小写和空格）
+	// 按 && 分割（符号形式）
+	if hasOperator(query, "&&") {
+		parts := splitByShodanOperatorSymbol(query, "&&")
+		var results []string
+		for _, part := range parts {
+			parsed := parseShodanLogicExpression(strings.TrimSpace(part))
+			if parsed != "" {
+				results = append(results, parsed)
+			}
+		}
+		if len(results) > 0 {
+			return strings.Join(results, " && ")
+		}
+		return ""
+	}
+
+	// 按 AND 分割（需要处理大小写和空格，文本形式）
 	if strings.Contains(strings.ToUpper(query), " AND ") {
 		parts := splitByShodanOperator(query, " AND ")
 		var results []string
@@ -173,6 +205,109 @@ func splitByShodanOperator(query, operator string) []string {
 			current.WriteByte(query[i])
 		} else {
 			current.WriteByte(query[i])
+		}
+	}
+
+	if current.Len() > 0 {
+		parts = append(parts, current.String())
+	}
+
+	return parts
+}
+
+// hasOperator 检查查询中是否包含操作符（不在引号内）
+func hasOperator(query, operator string) bool {
+	inQuotes := false
+	quoteChar := byte(0)
+	depth := 0
+
+	for i := 0; i <= len(query)-len(operator); i++ {
+		char := query[i]
+
+		// 处理引号
+		if (char == '"' || char == '\'') && (i == 0 || query[i-1] != '\\') {
+			if !inQuotes {
+				inQuotes = true
+				quoteChar = char
+			} else if char == quoteChar {
+				inQuotes = false
+				quoteChar = 0
+			}
+			continue
+		}
+
+		// 如果在引号内，跳过
+		if inQuotes {
+			continue
+		}
+
+		// 处理括号深度
+		if char == '(' {
+			depth++
+			continue
+		} else if char == ')' {
+			depth--
+			continue
+		}
+
+		// 检查操作符（不在引号内，不在括号内）
+		if depth == 0 && query[i:i+len(operator)] == operator {
+			return true
+		}
+	}
+
+	return false
+}
+
+// splitByShodanOperatorSymbol 按符号操作符（如 || 或 &&）分割，但要注意括号和引号内的内容
+func splitByShodanOperatorSymbol(query, operator string) []string {
+	var parts []string
+	var current strings.Builder
+	depth := 0
+	inQuotes := false
+	quoteChar := byte(0)
+	operatorLen := len(operator)
+
+	for i := 0; i < len(query); i++ {
+		char := query[i]
+
+		// 处理引号
+		if (char == '"' || char == '\'') && (i == 0 || query[i-1] != '\\') {
+			if !inQuotes {
+				inQuotes = true
+				quoteChar = char
+			} else if char == quoteChar {
+				inQuotes = false
+				quoteChar = 0
+			}
+			current.WriteByte(char)
+			continue
+		}
+
+		// 如果在引号内，直接添加字符
+		if inQuotes {
+			current.WriteByte(char)
+			continue
+		}
+
+		// 处理括号
+		if char == '(' {
+			depth++
+			current.WriteByte(char)
+		} else if char == ')' {
+			depth--
+			current.WriteByte(char)
+		} else if depth == 0 {
+			// 检查是否匹配操作符（不在引号内，不在括号内）
+			if i+operatorLen <= len(query) && query[i:i+operatorLen] == operator {
+				parts = append(parts, current.String())
+				current.Reset()
+				i += operatorLen - 1 // 跳过操作符
+				continue
+			}
+			current.WriteByte(char)
+		} else {
+			current.WriteByte(char)
 		}
 	}
 
@@ -325,6 +460,11 @@ func parseShodanFilter(filter string) string {
 	if len(matches) == 3 {
 		field := strings.ToLower(matches[1])
 		value := strings.TrimSpace(matches[2])
+
+		// 如果字段是 country，直接跳过（不支持 country 字段）
+		if field == "country" {
+			return ""
+		}
 
 		// 移除值两端的引号（如果存在）
 		value = strings.Trim(value, `"'`)

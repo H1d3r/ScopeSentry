@@ -17,7 +17,7 @@ type Plugin interface {
 	Cycle() string
 	Install() error
 	Execute(op options.PluginOption) error
-	TaskEnd(task models.Task) error
+	TaskEnd(task models.Task, plgHash string) error
 	Clone() Plugin
 	Log(msg string, tp ...string)
 	GetPluginId() string

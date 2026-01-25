@@ -159,18 +159,17 @@ func (s *Scheduler) AddJob(job *Job) error {
 
 // RemoveJob 移除一个任务
 func (s *Scheduler) RemoveJob(jobID string) error {
-	// 从 MongoDB 中删除任务
-	_, err := s.jobsCollection.DeleteOne(context.Background(), bson.M{"_id": jobID})
-	if err != nil {
-		return err
-	}
-
 	// 从调度器中移除任务
 	if job, exists := s.jobs[jobID]; exists {
 		s.scheduler.RemoveByReference(job)
 		delete(s.jobs, jobID)
 	}
 
+	// 从 MongoDB 中删除任务
+	_, err := s.jobsCollection.DeleteOne(context.Background(), bson.M{"_id": jobID})
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

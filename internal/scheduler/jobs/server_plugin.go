@@ -44,7 +44,7 @@ func ServerPluginRunner(id string, nextTime string) error {
 		}
 		mongodb.UpdateOne("plugins", bson.M{"hash": id}, bson.M{"$set": bson.M{"lastTime": helper.GetNowTimeString(), "nextTime": nextTime}})
 		plgRunner.Log("plugin is running")
-		err := plgRunner.Execute(options.PluginOptionInit)
+		err := plgRunner.Execute(options.NewOption(id))
 		if err != nil {
 			logger.Error(err.Error())
 			plgRunner.Log(fmt.Sprintf("plugin execution error: %v", err), "e")

@@ -186,11 +186,17 @@ func parseFofaCondition(condition string) string {
 
 	// 定义 fofa 字段映射（fofa字段 -> 自定义字段）
 	fieldMap := map[string]string{
-		"app":       "app",
-		"title":     "title",
-		"body":      "body",
-		"header":    "header",
-		"icon_hash": "icon",
+		"app":           "app",
+		"title":         "title",
+		"body":          "body",
+		"header":        "header",
+		"icon_hash":     "icon",
+		"protocol":      "service",
+		"banner":        "banner",
+		"banner_hash":   "banner",
+		"base_protocol": "service",
+		"status_code":   "statuscode",
+		"js_name":       "body",
 	}
 
 	// 匹配 fofa 查询格式，支持 =, ==, !=, *=

@@ -42,6 +42,7 @@ type Service interface {
 	TaskProgressNumber(ctx *gin.Context) error
 	TaskProgress(ctx context.Context) error
 	ProcessTaskProgress(ctx context.Context, task models.Task) error
+	GetAllTaskNames(ctx *gin.Context) ([]models.Task, error)
 }
 
 // service 实现Service接口
@@ -590,4 +591,27 @@ func (s *service) ProcessTaskProgress(ctx context.Context, task models.Task) err
 	}
 
 	return nil
+}
+
+// GetAllTaskNames 获取所有任务名称，按 id 倒序
+func (s *service) GetAllTaskNames(ctx *gin.Context) ([]models.Task, error) {
+	filter := bson.M{}
+
+	// 只查询 id 和 name 字段
+	projection := bson.M{
+		"_id":  1,
+		"name": 1,
+	}
+
+	// 按 id 倒序排序
+	opts := options.Find().
+		SetProjection(projection).
+		SetSort(bson.D{{Key: "_id", Value: -1}})
+
+	tasks, err := s.taskRepo.Find(ctx.Request.Context(), filter, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
 }

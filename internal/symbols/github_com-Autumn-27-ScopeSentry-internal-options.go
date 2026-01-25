@@ -10,6 +10,7 @@ import (
 func init() {
 	Symbols["github.com/Autumn-27/ScopeSentry/internal/options/options"] = map[string]reflect.Value{
 		// function, constant and variable definitions
+		"NewOption":        reflect.ValueOf(options.NewOption),
 		"PluginOptionInit": reflect.ValueOf(&options.PluginOptionInit).Elem(),
 
 		// type definitions

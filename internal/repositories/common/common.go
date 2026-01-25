@@ -25,6 +25,7 @@ import (
 type Repository interface {
 	// MongoDB helpers
 	Find(ctx context.Context, coll string, filter interface{}, opts *options.FindOptions, result interface{}) error
+	FindField(ctx context.Context, collection string, filter bson.M, limit int64, fields []string, result interface{}) error
 	FindOne(ctx context.Context, coll string, filter interface{}, projection bson.M) (bson.M, error)
 	FindMany(ctx context.Context, coll string, filter interface{}, opts *options.FindOptions) ([]bson.M, error)
 	Count(ctx context.Context, coll string, filter interface{}) (int64, error)
@@ -47,6 +48,7 @@ type Repository interface {
 	SCard(ctx context.Context, key string) (int64, error)
 	SMembers(ctx context.Context, key string) ([]string, error)
 	SAdd(ctx context.Context, key string, members ...interface{}) error
+	SRem(ctx context.Context, key string, members ...interface{}) error
 	LPush(ctx context.Context, key string, values interface{}) error
 	RPush(ctx context.Context, key string, values ...interface{}) error
 	LRange(ctx context.Context, key string, start, stop int64) ([]string, error)
@@ -79,6 +81,27 @@ func (r *repository) Find(ctx context.Context, coll string, filter interface{}, 
 
 	// 多条查询
 	cur, err := collection.Find(ctx, filter, opts)
+	if err != nil {
+		return err
+	}
+	defer cur.Close(ctx)
+
+	return cur.All(ctx, result)
+}
+
+func (r *repository) FindField(ctx context.Context, collection string, filter bson.M, limit int64, fields []string, result interface{}) error {
+	findOpts := options.Find()
+	if limit > 0 {
+		findOpts.SetLimit(limit)
+	}
+	if len(fields) > 0 {
+		projection := bson.M{}
+		for _, f := range fields {
+			projection[f] = 1
+		}
+		findOpts.SetProjection(projection)
+	}
+	cur, err := r.db.Collection(collection).Find(ctx, filter, findOpts)
 	if err != nil {
 		return err
 	}
@@ -198,6 +221,10 @@ func (r *repository) SMembers(ctx context.Context, key string) ([]string, error)
 
 func (r *repository) SAdd(ctx context.Context, key string, members ...interface{}) error {
 	return r.redisClient.SAdd(ctx, key, members...).Err()
+}
+
+func (r *repository) SRem(ctx context.Context, key string, members ...interface{}) error {
+	return r.redisClient.SRem(ctx, key, members...).Err()
 }
 
 func (r *repository) LPush(ctx context.Context, key string, values interface{}) error {

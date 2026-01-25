@@ -65,6 +65,12 @@ func registerTaskRoutes() models.RouteGroup {
 				Handler:     taskHandler.ProgressInfo,
 				Middlewares: common.WithAuth(),
 			},
+			{
+				Method:      "GET",
+				Path:        "names",
+				Handler:     taskHandler.GetAllTaskNames,
+				Middlewares: common.WithAuth(),
+			},
 		},
 	}
 }

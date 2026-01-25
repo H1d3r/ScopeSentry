@@ -339,6 +339,35 @@ func ProgressInfo(c *gin.Context) {
 	response.Success(c, progressData, "")
 }
 
+// GetAllTaskNames 获取所有任务名称
+// @Summary      获取所有任务名称
+// @Description  返回所有任务名称，按 id 倒序排列
+// @Tags         task
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  response.SuccessResponse{data=[]object{id=string,name=string}}
+// @Failure      500  {object}  response.InternalServerErrorResponse
+// @Router       /api/task/names [post]
+func GetAllTaskNames(c *gin.Context) {
+	tasks, err := taskService.GetAllTaskNames(c)
+	if err != nil {
+		logger.Error(fmt.Sprintf("GetAllTaskNames %v", err))
+		response.InternalServerError(c, "api.error", err)
+		return
+	}
+
+	// 构建返回数据，只包含 id 和 name
+	result := make([]map[string]interface{}, 0, len(tasks))
+	for _, t := range tasks {
+		result = append(result, map[string]interface{}{
+			"id":   t.ID.Hex(),
+			"name": t.Name,
+		})
+	}
+
+	response.Success(c, result, "")
+}
+
 func init() {
 	taskService = task.NewService()
 	commonService = common.NewService()

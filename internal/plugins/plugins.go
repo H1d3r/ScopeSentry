@@ -65,10 +65,10 @@ func LoadPlugin(code string, plgHash string) (interfaces.Plugin, error) {
 
 	// 获取TaskEnd
 	v, err = interp.Eval("plugin.TaskEnd")
-	taskEndFunc := func(task models.Task) error { return nil }
+	taskEndFunc := func(task models.Task, plgHash string) error { return nil }
 	if err != nil {
 	} else {
-		taskEndFunc = v.Interface().(func(task models.Task) error)
+		taskEndFunc = v.Interface().(func(task models.Task, plgHash string) error)
 	}
 
 	// 获取Cycle
@@ -129,9 +129,17 @@ func (pm *PluginManager) GetPlugin(id string) (interfaces.Plugin, bool) {
 	return plugin.Clone(), true
 }
 
+func (pm *PluginManager) DeletePlugin(id string) {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	delete(pm.plugins, id)
+}
+
 type PluginInfo struct {
 	Hash   string `bson:"hash"`
 	Source string `bson:"source"`
+	Model  string `bson:"model"`
+	Status bool   `bson:"status"`
 }
 
 func InstallPlugin() {
@@ -141,6 +149,7 @@ func InstallPlugin() {
 			"module": 1,
 			"hash":   1,
 			"source": 1,
+			"status": 1,
 			"_id":    0,
 		})
 	err := mongodb.FindMany(
@@ -166,6 +175,10 @@ func InstallPlugin() {
 		if err != nil {
 			logger.Error(err.Error())
 			return
+		}
+		// 启动时判断是否需要运行一次
+		if plugin.Status == true {
+			RunPluginOnce(plugin.Hash)
 		}
 	}
 }
