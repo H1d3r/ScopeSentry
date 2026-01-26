@@ -7,7 +7,7 @@ networks:
 
 services:
   mongodb:
-    image: mongo:7.0.4
+    image: mongo:7.0.28
     container_name: scopesentry-mongodb
     restart: always
     ports:
