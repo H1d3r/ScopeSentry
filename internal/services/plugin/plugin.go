@@ -207,13 +207,8 @@ func (s *service) Save(ctx *gin.Context, req *models.PluginSaveRequest) error {
 				}
 			}()
 		} else {
-			// server的时候id是插件的hash
-			loadPlugin, err := plugins.LoadPlugin(req.Source, req.Hash)
-			if err != nil {
-				logger.Error("failed to load plugin", zap.Error(err))
-				return err
-			}
-			plugins.GlobalPluginManager.RegisterPlugin(req.Hash, loadPlugin)
+			// 如果是更新 也重新注册插件
+			RegisterPlugin(req.Source, req.Hash)
 		}
 	}
 	// 服务端插件 无论是插入还是更新，判断cycle是不是1 如果是1 表示运行1次
@@ -723,7 +718,7 @@ func (s *service) ImportByData(ctx *gin.Context, req *models.PluginImportByDataR
 		}()
 	}
 	if pluginInfo.Type == "server" {
-		RegisterPlugin(pluginInfo.Source, pluginInfo.Hash)
+		RegisterPlugin(req.Source, pluginInfo.Hash)
 		plugins.RunPluginOnce(pluginInfo.Hash)
 	}
 

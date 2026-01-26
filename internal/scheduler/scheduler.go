@@ -117,11 +117,28 @@ func (s *Scheduler) AddJob(job *Job) error {
 		return fmt.Errorf("handler %s not registered", job.Handler)
 	}
 
+	// 检查任务是否已经存在（内存中）
+	if _, exists := s.jobs[job.ID]; exists {
+		// 任务已存在，直接返回成功
+		return nil
+	}
+
+	// 检查任务是否已经存在于 MongoDB 中
+	var existingJob Job
+	err := s.jobsCollection.FindOne(context.Background(), bson.M{"_id": job.ID}).Decode(&existingJob)
+	if err == nil {
+		// 任务在数据库中已存在，直接返回成功
+		return nil
+	} else if err != mongo.ErrNoDocuments {
+		// 查询出错（不是"未找到文档"的错误）
+		return fmt.Errorf("failed to check if job exists: %w", err)
+	}
+
 	// 将任务保存到 MongoDB
 	job.CreatedAt = helper.GetNowTime()
 	job.UpdatedAt = helper.GetNowTime()
 
-	_, err := s.jobsCollection.InsertOne(context.Background(), job)
+	_, err = s.jobsCollection.InsertOne(context.Background(), job)
 	if err != nil {
 		return err
 	}
@@ -170,6 +187,7 @@ func (s *Scheduler) RemoveJob(jobID string) error {
 	if err != nil {
 		return err
 	}
+	s.logger.Info("Successfully remove job")
 	return nil
 }
 

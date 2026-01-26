@@ -1,4 +1,4 @@
-// plugin_template-------------------------------------
+// nuclei_monitor-------------------------------------
 // @file      : nuclei_monitor.go
 // @author    : Autumn
 // @contact   : rainy-autumn@outlook.com

@@ -9,7 +9,7 @@ package plugin
 
 import (
 	"fmt"
-	"github.com/Autumn-27/ScopeSentry/internal/logger"
+
 	schedulerCore "github.com/Autumn-27/ScopeSentry/internal/scheduler"
 )
 
@@ -22,9 +22,12 @@ func AddJob(hash string, schedule string) error {
 		CycleType: "cron",
 		Schedule:  schedule,
 	}
-
+	// 先删除 再增加
+	err := schedulerCore.GetGlobalScheduler().RemoveJob(job.ID)
+	if err != nil {
+		return err
+	}
 	if err := schedulerCore.GetGlobalScheduler().AddJob(job); err != nil {
-		logger.Error(err.Error())
 		return fmt.Errorf("failed to add scheduled task: %w", err)
 	}
 	return nil
