@@ -37,6 +37,10 @@ docker-compose -f single-host-deployment.yml up -d
 ```
 运行之后一共四个容器scope-sentry (服务端-web界面)、scopesentry-scan (扫描端)、Mongodb (数据库)、Redis。（默认会有一个扫描节点）
 
+查看初始用户密码以及插件二次验证密码
+
+```docker logs scope-sentry```
+
 
 **添加新的节点(可选)**
 ```

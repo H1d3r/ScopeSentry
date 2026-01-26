@@ -42,6 +42,9 @@ docker-compose -f single-host-deployment.yml up -d
 ```
 After running, there will be four containers: mongodb, redis, scope-sentry (server), and scopesentry-scan (scan). By default, there will be one scanning node.
 
+View the initial user password and the secondary verification password of the plug-in
+
+```docker logs scope-sentry```
 
 **Add new nodes(Optional)**
 
