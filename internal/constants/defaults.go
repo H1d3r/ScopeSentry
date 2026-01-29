@@ -300,7 +300,7 @@ var ScanTemplateDefault = models.ScanTemplate{
 		SubdomainSecurity:   map[string]string{},
 		PortScanPreparation: map[string]string{},
 		PortScan: map[string]string{
-			"66b4ddeb983387df2b7ee7726653874d": "-port {port.nmap top 1000} -b 600 -t 3000",
+			"66b4ddeb983387df2b7ee7726653874d": "-port {port.top1000} -b 600 -t 3000",
 		},
 		PortFingerprint: map[string]string{},
 		AssetMapping: map[string]string{
