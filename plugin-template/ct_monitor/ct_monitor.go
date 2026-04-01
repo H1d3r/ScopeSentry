@@ -44,6 +44,11 @@ func Install() error {
 var blacklist = []string{
 	"google.com",
 }
+
+// 排除包含字符串的域名
+var subdomainBlacklist = []string{
+	".prod.",
+}
 var CTSDK *ct.CTWatcherSDK
 var OP options.PluginOption
 
@@ -69,22 +74,22 @@ func Execute(op options.PluginOption) error {
 				Timeout:       30 * time.Second,
 				MaxRetries:    3,
 			},
-			{
-				URL:           "https://ct.googleapis.com/logs/us1/argon2026h2/",
-				BatchSize:     500,
-				ParallelFetch: 10,
-				BufferSize:    1000,
-				Timeout:       30 * time.Second,
-				MaxRetries:    3,
-			},
-			{
-				URL:           "https://ct.googleapis.com/logs/us1/argon2027h1/",
-				BatchSize:     500,
-				ParallelFetch: 10,
-				BufferSize:    1000,
-				Timeout:       30 * time.Second,
-				MaxRetries:    3,
-			},
+			//{
+			//	URL:           "https://ct.googleapis.com/logs/us1/argon2026h2/",
+			//	BatchSize:     500,
+			//	ParallelFetch: 10,
+			//	BufferSize:    1000,
+			//	Timeout:       30 * time.Second,
+			//	MaxRetries:    3,
+			//},
+			//{
+			//	URL:           "https://ct.googleapis.com/logs/us1/argon2027h1/",
+			//	BatchSize:     500,
+			//	ParallelFetch: 10,
+			//	BufferSize:    1000,
+			//	Timeout:       30 * time.Second,
+			//	MaxRetries:    3,
+			//},
 			{
 				URL:           "https://ct.googleapis.com/logs/eu1/xenon2026h1/",
 				BatchSize:     500,
@@ -93,38 +98,38 @@ func Execute(op options.PluginOption) error {
 				Timeout:       30 * time.Second,
 				MaxRetries:    3,
 			},
-			{
-				URL:           "https://ct.googleapis.com/logs/eu1/xenon2026h2/",
-				BatchSize:     500,
-				ParallelFetch: 10,
-				BufferSize:    1000,
-				Timeout:       30 * time.Second,
-				MaxRetries:    3,
-			},
-			{
-				URL:           "https://ct.googleapis.com/logs/eu1/xenon2027h1/",
-				BatchSize:     500,
-				ParallelFetch: 10,
-				BufferSize:    1000,
-				Timeout:       30 * time.Second,
-				MaxRetries:    3,
-			},
-			{
-				URL:           "https://ct.cloudflare.com/logs/nimbus2026/",
-				BatchSize:     500,
-				ParallelFetch: 10,
-				BufferSize:    1000,
-				Timeout:       30 * time.Second,
-				MaxRetries:    3,
-			},
-			{
-				URL:           "https://ct.cloudflare.com/logs/nimbus2027/",
-				BatchSize:     500,
-				ParallelFetch: 10,
-				BufferSize:    1000,
-				Timeout:       30 * time.Second,
-				MaxRetries:    3,
-			},
+			//{
+			//	URL:           "https://ct.googleapis.com/logs/eu1/xenon2026h2/",
+			//	BatchSize:     500,
+			//	ParallelFetch: 10,
+			//	BufferSize:    1000,
+			//	Timeout:       30 * time.Second,
+			//	MaxRetries:    3,
+			//},
+			//{
+			//	URL:           "https://ct.googleapis.com/logs/eu1/xenon2027h1/",
+			//	BatchSize:     500,
+			//	ParallelFetch: 10,
+			//	BufferSize:    1000,
+			//	Timeout:       30 * time.Second,
+			//	MaxRetries:    3,
+			//},
+			//{
+			//	URL:           "https://ct.cloudflare.com/logs/nimbus2026/",
+			//	BatchSize:     500,
+			//	ParallelFetch: 10,
+			//	BufferSize:    1000,
+			//	Timeout:       30 * time.Second,
+			//	MaxRetries:    3,
+			//},
+			//{
+			//	URL:           "https://ct.cloudflare.com/logs/nimbus2027/",
+			//	BatchSize:     500,
+			//	ParallelFetch: 10,
+			//	BufferSize:    1000,
+			//	Timeout:       30 * time.Second,
+			//	MaxRetries:    3,
+			//},
 		},
 		// 域名匹配器配置
 		DomainMatcher: &types.DomainMatcherConfig{
@@ -226,7 +231,12 @@ func Execute(op options.PluginOption) error {
 			// 已存在，跳过处理
 			return
 		}
-
+		// 排除域名
+		for _, domain := range subdomainBlacklist {
+			if strings.Contains(event.Subdomain, domain) {
+				return
+			}
+		}
 		// 标记为已处理（使用写锁）
 		subdomainMu.Lock()
 		processedSubdomains[event.Subdomain] = struct{}{}
