@@ -52,13 +52,13 @@ type batchAddRequest struct {
 
 // Fingerprint YAML 指纹定义
 type Fingerprint struct {
-	Name           string `yaml:"name"`
-	Id             string `yaml:"id"`
-	Tags           string `yaml:"tags"`
-	Category       string `yaml:"category"`
-	ParentCategory string `yaml:"parent_category"`
-	Company        string `yaml:"company"`
-	Rules          []Rule `yaml:"rules"`
+	Name           string   `yaml:"name"`
+	Id             string   `yaml:"id"`
+	Tags           []string `yaml:"tags"`
+	Category       string   `yaml:"category"`
+	ParentCategory string   `yaml:"parent_category"`
+	Company        string   `yaml:"company"`
+	Rules          []Rule   `yaml:"rules"`
 }
 
 type FingerprintYaml struct {
